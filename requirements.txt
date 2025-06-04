@@ -1,3 +1,5 @@
-numpy==1.26.4
-tflite-runtime==2.14.0
-pillow
+numpy==1.19.5
+tflite-runtime==2.9.1
+pillow==11.2.1
+mpio==1.5
+gpiod==2.3.0
