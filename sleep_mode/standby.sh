@@ -1,0 +1,1 @@
+sudo rtcwake -m standby -s "$1"
