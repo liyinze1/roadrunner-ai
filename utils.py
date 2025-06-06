@@ -1,5 +1,6 @@
 import mpio
 import serial
+import yaml
 
 class Flute_Connection:
     def __init__(self):
@@ -38,3 +39,9 @@ class RoadRunner:
     @staticmethod
     def shutdown():
         pass
+    
+    @staticmethod
+    def standby():
+        pass
+    
+class 
