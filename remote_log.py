@@ -3,7 +3,7 @@ import time
 
 def main():
     serial_port = '/dev/ttyS0'  # Change this to your actual serial device
-    baud_rate = 9600              # Adjust as needed
+    baud_rate = 115200              # Adjust as needed
     log_file = 'log.txt'
 
     try:
