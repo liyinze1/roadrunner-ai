@@ -17,8 +17,11 @@ iteration=0
 
 while true; do
     ((iteration++))
-    echo "--- Iteration $iteration ---"
-    sudo fswebcam -p RGB565 -r 1280x720 tinyRGB565.png
+    
+    printf "Iteration: %d\n" "$iteration"
+    printf "Iteration: %d\n" "$iteration" >> log_10.txt
+
+    sudo fswebcam -i 0 -p RGB565 -r 1280x720 tinyRGB565.png
 
     # Run Python script as original user
     sudo -u "acme" python3 yolo_inference.py
@@ -30,10 +33,18 @@ while true; do
     voltage=$(cat /sys/bus/iio/devices/iio:device0/in_voltage0_raw)
 
 
-    printf "Time elapsed: %.3f seconds | Iteration: %d | Voltage: %s\n" "$elapsed" "$iteration" "$voltage"
-
+    printf "Time elapsed: %.3f seconds | Voltage: %s\n" "$elapsed" "$voltage"
     # Write to log file
-    printf "Time elapsed: %.3f seconds | Iteration: %d | Voltage: %s\n" "$elapsed" "$iteration" "$voltage" >> log.txt
+    printf "Time elapsed: %.3f seconds | Voltage: %s\n" "$elapsed" "$voltage" >> log_10.txt
 
+    sudo bash sleep_modes/suspend_to_ram.sh 346
+
+    end_time=$(date +%s.%N)
+    elapsed=$(awk "BEGIN {print $end_time - $start_time}")
+    voltage=$(cat /sys/bus/iio/devices/iio:device0/in_voltage0_raw)
+
+    printf "wake up: %.3f seconds | Voltage: %s\n" "$elapsed" "$voltage"
+    # Write to log file
+    printf "wake up: %.3f seconds | Voltage: %s\n" "$elapsed" "$voltage" >> log_10.txt
 
 done
