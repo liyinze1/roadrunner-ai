@@ -41,3 +41,15 @@ sudo gpioinfo gpiochip0
 | PA11  | S1  | Photovoltaic Measurement
 | PA13  | S2  | Open-circuit Feature
 | PA17  | S3  | Sensor Power Switch
+
+
+### Run the loop service
+
+```bash
+sudo cp loop.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable loop.service
+sudo systemctl start loop.service
+sudo systemctl status loop.service
+sudo systemctl stop loop.service
+```
