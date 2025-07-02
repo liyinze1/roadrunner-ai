@@ -12,6 +12,12 @@ def main():
             while True:
                 if ser.in_waiting:
                     line = ser.readline().decode('utf-8', errors='replace').strip()
+                    if line.startswith('votage'):
+                        try:
+                            voltage = int(line.split(':')[1]) * 3.3 / 16384
+                            line = line + ' ' + str(voltage) + 'V'
+                        except:
+                            pass
                     timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
                     log_line = f'[{timestamp}] {line}\n'
                     with open(log_file, 'a') as log:
