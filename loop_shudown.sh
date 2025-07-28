@@ -30,4 +30,4 @@ echo "Voltage: $voltage" > "$DEVICE"
 
 echo "go to sleep" > "$DEVICE"
 
-sudo bash sleep_modes/shutdown_with_wake.sh 344 # 10%
+sudo bash sleep_modes/shutdown_with_wake.sh 4214 # 1%, 1347 3%, 344 10%
