@@ -52,4 +52,5 @@ sudo systemctl enable loop.service
 sudo systemctl start loop.service
 sudo systemctl status loop.service
 sudo systemctl stop loop.service
+sudo systemctl disable loop.service
 ```
