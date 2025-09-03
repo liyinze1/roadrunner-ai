@@ -48,6 +48,8 @@ def main():
     
     print(f'Output shape: {output_data.shape}')
     
+    # process segmentation output
+    
     # boxes, class_ids, confidences = process_output(output_data)
 
     print(f'Inference time: {inference_time:.3f} seconds')
