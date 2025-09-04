@@ -21,68 +21,60 @@ def preprocess_image(image_path, input_shape):
     image_np = np.expand_dims(image_np, axis=0)
     return image_np
 
-def process_output(output_data, conf_threshold=0.25):
-    output = output_data[0]  # (84, 8400)
-    boxes = output[:4, :].T  # (8400, 4)
-    objectness = output[4, :]
-    class_probs = output[5:, :].T  # (8400, 80)
-    scores = objectness[:, None] * class_probs  # (8400, 80)
-
-    class_ids = np.argmax(scores, axis=1)
-    confidences = np.max(scores, axis=1)
-
-    mask = confidences > conf_threshold
-    return boxes[mask], class_ids[mask], confidences[mask]
-
 def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.25, mask_thresh=0.5):
     """
-    Count foreground pixels in masks from YOLOv11n-seg model output using only NumPy and PIL.
+    Count foreground pixels in YOLOv11n-seg masks using NumPy + PIL only.
 
     Args:
-        output: ndarray of shape (1, 37, 8400) — model output
-        proto: ndarray of shape (160, 160, 32) — prototype masks (without batch dim)
-        image_size: (H, W) — size of the input image
-        conf_thresh: float — confidence threshold
-        mask_thresh: float — binarization threshold for masks
+        output: ndarray of shape (1, 37, 8400) — YOLO model output
+        proto: ndarray of shape (H_proto, W_proto, C) — prototype mask without batch dim
+        image_size: (H_img, W_img) — target size of masks (e.g., original image size)
+        conf_thresh: float — minimum confidence to keep detection
+        mask_thresh: float — binarization threshold for the mask
 
     Returns:
-        List of pixel counts per mask (int)
+        List[int] — number of foreground pixels in each valid mask
     """
-    output = output[0]  # shape: (37, 8400)
+    output = output[0]  # Remove batch dim → shape: (37, 8400)
+    H_img, W_img = image_size
 
-    # Parse the outputs
-    objectness = output[4, :]              # (8400,)
-    class_conf = output[5, :]              # (8400,)
-    mask_coeffs_all = output[6:, :].T      # (8400, 31)
+    # Get number of mask channels from proto shape
+    num_mask_coeffs = proto.shape[2]  # e.g., 32
 
-    # Confidence score
-    conf = objectness * class_conf         # (8400,)
+    # Extract predictions
+    objectness = output[4, :]                        # (8400,)
+    class_conf = output[5, :]                        # (8400,)
+    mask_coeffs_all = output[6:6+num_mask_coeffs, :].T  # (8400, num_mask_coeffs)
+
+    # Final confidence score = objectness × class confidence
+    conf = objectness * class_conf
     keep = conf > conf_thresh
 
     mask_coeffs = mask_coeffs_all[keep]
     if mask_coeffs.shape[0] == 0:
         return []
 
-    # Proto: (H, W, C) → (H*W, C)
-    proto_flat = proto.reshape(-1, proto.shape[2])  # (160*160, 32)
+    # Flatten proto for dot product
+    proto_flat = proto.reshape(-1, num_mask_coeffs)  # shape: (H_proto*W_proto, C)
 
-    # Dot product: (N, 31) x (31, H*W) → (N, H*W)
-    masks = np.dot(mask_coeffs, proto_flat.T)       # (N, 160*160)
-    masks = 1 / (1 + np.exp(-masks))                # sigmoid
-    masks = masks.reshape(-1, proto.shape[0], proto.shape[1])  # (N, 160, 160)
+    # Generate masks: (N, C) × (C, H*W) → (N, H*W)
+    masks = np.dot(mask_coeffs, proto_flat.T)        # (N, H_proto * W_proto)
+    masks = 1 / (1 + np.exp(-masks))                 # sigmoid
+    H_proto, W_proto = proto.shape[:2]
+    masks = masks.reshape(-1, H_proto, W_proto)      # (N, H_proto, W_proto)
 
-    H, W = image_size
+    # Resize & count pixels
     pixel_counts = []
     for i in range(masks.shape[0]):
-        # Resize with PIL
         mask_np = masks[i]
-        pil_mask = Image.fromarray((mask_np * 255).astype(np.uint8))  # convert to grayscale image
-        pil_resized = pil_mask.resize((W, H), resample=Image.BILINEAR)
+        pil_mask = Image.fromarray((mask_np * 255).astype(np.uint8))  # grayscale image
+        pil_resized = pil_mask.resize((W_img, H_img), resample=Image.BILINEAR)
         mask_resized_np = np.array(pil_resized) / 255.0
         binary_mask = (mask_resized_np > mask_thresh).astype(np.uint8)
         pixel_counts.append(int(binary_mask.sum()))
 
     return pixel_counts
+
 
 def main():
     input_data = preprocess_image('water.jpg', input_shape)
