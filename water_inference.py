@@ -82,7 +82,7 @@ def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.
         binary_mask = (mask_resized_np > mask_thresh).astype(np.uint8)
         pixel_counts.append(int(binary_mask.sum()))
 
-    return pixel_counts
+    return sum(pixel_counts) / (H_img * W_img)
 
 
 
