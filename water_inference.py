@@ -91,9 +91,10 @@ def main():
     start = time()
     interpreter.set_tensor(input_index, input_data)
     interpreter.invoke()
-    inference_time = time() - start
 
-    # Get and process output
+    output = interpreter.get_tensor(output_details[0]['index'])  # (1, 37, 8400)
+    proto  = interpreter.get_tensor(output_details[1]['index']) 
+    
     output = np.array(output)
     proto = np.array(proto)[0]  # remove batch → (160, 160, 32)
 
@@ -104,6 +105,7 @@ def main():
     print(f'Pixel counts: {pixel_counts}')
     
 
+    inference_time = time() - start
     print(f'Inference time: {inference_time:.3f} seconds')
     # for box, cls, conf in zip(boxes, class_ids, confidences):
     #     print(f'water: {conf:.2f}, box: {box}')
