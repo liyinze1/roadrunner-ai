@@ -20,6 +20,8 @@ def preprocess_image(image_path, input_shape):
     image_np = np.array(image, dtype=np.float32) / 255.0
     image_np = np.expand_dims(image_np, axis=0)
     return image_np
+import numpy as np
+from PIL import Image
 
 def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.25, mask_thresh=0.5):
     """
@@ -27,7 +29,7 @@ def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.
 
     Args:
         output: ndarray of shape (1, 37, 8400) — YOLO model output
-        proto: ndarray of shape (H_proto, W_proto, C) — prototype mask without batch dim
+        proto: ndarray of shape (H_proto, W_proto, C) — prototype mask (without batch dim)
         image_size: (H_img, W_img) — target size of masks (e.g., original image size)
         conf_thresh: float — minimum confidence to keep detection
         mask_thresh: float — binarization threshold for the mask
@@ -38,42 +40,50 @@ def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.
     output = output[0]  # Remove batch dim → shape: (37, 8400)
     H_img, W_img = image_size
 
-    # Get number of mask channels from proto shape
-    num_mask_coeffs = proto.shape[2]  # e.g., 32
+    # Detect mask channel count from output
+    total_channels, num_anchors = output.shape  # total_channels = 37
+    num_mask_coeffs = total_channels - 6  # 4 bbox + 1 obj + 1 cls = 6 → rest are mask coeffs
 
-    # Extract predictions
-    objectness = output[4, :]                        # (8400,)
-    class_conf = output[5, :]                        # (8400,)
-    mask_coeffs_all = output[6:6+num_mask_coeffs, :].T  # (8400, num_mask_coeffs)
+    # Parse model outputs
+    objectness = output[4, :]                          # (8400,)
+    class_conf = output[5, :]                          # (8400,)
+    mask_coeffs_all = output[6:6+num_mask_coeffs, :].T # (8400, num_mask_coeffs)
 
-    # Final confidence score = objectness × class confidence
-    conf = objectness * class_conf
+    # Final object confidence
+    conf = objectness * class_conf                     # (8400,)
     keep = conf > conf_thresh
-
     mask_coeffs = mask_coeffs_all[keep]
+
     if mask_coeffs.shape[0] == 0:
         return []
 
+    # 🔧 Fix proto if it has more channels than mask_coeffs
+    if proto.shape[2] > mask_coeffs.shape[1]:
+        proto = proto[:, :, :mask_coeffs.shape[1]]  # Trim proto to match coeffs
+    elif proto.shape[2] < mask_coeffs.shape[1]:
+        raise ValueError('mask_coeffs has more channels than proto — cannot compute mask.')
+
     # Flatten proto for dot product
-    proto_flat = proto.reshape(-1, num_mask_coeffs)  # shape: (H_proto*W_proto, C)
+    proto_flat = proto.reshape(-1, mask_coeffs.shape[1])  # (H_proto * W_proto, C)
 
-    # Generate masks: (N, C) × (C, H*W) → (N, H*W)
-    masks = np.dot(mask_coeffs, proto_flat.T)        # (N, H_proto * W_proto)
-    masks = 1 / (1 + np.exp(-masks))                 # sigmoid
+    # Mask generation: (N, C) x (C, H*W) → (N, H*W)
+    masks = np.dot(mask_coeffs, proto_flat.T)
+    masks = 1 / (1 + np.exp(-masks))                       # Sigmoid
     H_proto, W_proto = proto.shape[:2]
-    masks = masks.reshape(-1, H_proto, W_proto)      # (N, H_proto, W_proto)
+    masks = masks.reshape(-1, H_proto, W_proto)            # (N, H_proto, W_proto)
 
-    # Resize & count pixels
+    # Resize and count pixels
     pixel_counts = []
     for i in range(masks.shape[0]):
         mask_np = masks[i]
-        pil_mask = Image.fromarray((mask_np * 255).astype(np.uint8))  # grayscale image
+        pil_mask = Image.fromarray((mask_np * 255).astype(np.uint8))
         pil_resized = pil_mask.resize((W_img, H_img), resample=Image.BILINEAR)
         mask_resized_np = np.array(pil_resized) / 255.0
         binary_mask = (mask_resized_np > mask_thresh).astype(np.uint8)
         pixel_counts.append(int(binary_mask.sum()))
 
     return pixel_counts
+
 
 
 def main():
