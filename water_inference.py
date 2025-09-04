@@ -131,10 +131,10 @@ def save_combined_mask(masks, output_path='combined_mask.png'):
 
     combined = np.zeros_like(masks[0], dtype=np.uint8)
     for i, mask in enumerate(masks):
-        combined += mask * (i + 1)  # Assign each mask a unique label
+        combined += mask  # Assign each mask a unique label
 
     # Convert to color (optional)
-    img = Image.fromarray(combined * 40)  # scale to make mask visible
+    img = Image.fromarray(combined * 255)  # scale to make mask visible
     img.save(output_path)
     print(f'Saved combined mask to: {output_path}')
 
