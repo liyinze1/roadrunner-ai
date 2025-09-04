@@ -34,6 +34,56 @@ def process_output(output_data, conf_threshold=0.25):
     mask = confidences > conf_threshold
     return boxes[mask], class_ids[mask], confidences[mask]
 
+def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.25, mask_thresh=0.5):
+    """
+    Count foreground pixels in masks from YOLOv11n-seg model output using only NumPy and PIL.
+
+    Args:
+        output: ndarray of shape (1, 37, 8400) — model output
+        proto: ndarray of shape (160, 160, 32) — prototype masks (without batch dim)
+        image_size: (H, W) — size of the input image
+        conf_thresh: float — confidence threshold
+        mask_thresh: float — binarization threshold for masks
+
+    Returns:
+        List of pixel counts per mask (int)
+    """
+    output = output[0]  # shape: (37, 8400)
+
+    # Parse the outputs
+    objectness = output[4, :]              # (8400,)
+    class_conf = output[5, :]              # (8400,)
+    mask_coeffs_all = output[6:, :].T      # (8400, 31)
+
+    # Confidence score
+    conf = objectness * class_conf         # (8400,)
+    keep = conf > conf_thresh
+
+    mask_coeffs = mask_coeffs_all[keep]
+    if mask_coeffs.shape[0] == 0:
+        return []
+
+    # Proto: (H, W, C) → (H*W, C)
+    proto_flat = proto.reshape(-1, proto.shape[2])  # (160*160, 32)
+
+    # Dot product: (N, 31) x (31, H*W) → (N, H*W)
+    masks = np.dot(mask_coeffs, proto_flat.T)       # (N, 160*160)
+    masks = 1 / (1 + np.exp(-masks))                # sigmoid
+    masks = masks.reshape(-1, proto.shape[0], proto.shape[1])  # (N, 160, 160)
+
+    H, W = image_size
+    pixel_counts = []
+    for i in range(masks.shape[0]):
+        # Resize with PIL
+        mask_np = masks[i]
+        pil_mask = Image.fromarray((mask_np * 255).astype(np.uint8))  # convert to grayscale image
+        pil_resized = pil_mask.resize((W, H), resample=Image.BILINEAR)
+        mask_resized_np = np.array(pil_resized) / 255.0
+        binary_mask = (mask_resized_np > mask_thresh).astype(np.uint8)
+        pixel_counts.append(int(binary_mask.sum()))
+
+    return pixel_counts
+
 def main():
     input_data = preprocess_image('water.jpg', input_shape)
 
@@ -44,15 +94,15 @@ def main():
     inference_time = time() - start
 
     # Get and process output
-    output = interpreter.get_tensor(output_details[0]['index'])
-    proto = interpreter.get_tensor(output_details[1]['index']) 
+    output = np.array(output)
+    proto = np.array(proto)[0]  # remove batch → (160, 160, 32)
+
+    pixel_counts = count_mask_pixels_from_yolo_output(output, proto, image_size=(640, 640))
     
     print(f'Output shape: {output.shape}')
     print(f'Proto shape: {proto.shape}')
+    print(f'Pixel counts: {pixel_counts}')
     
-    # process segmentation output
-    
-    # boxes, class_ids, confidences = process_output(output_data)
 
     print(f'Inference time: {inference_time:.3f} seconds')
     # for box, cls, conf in zip(boxes, class_ids, confidences):
