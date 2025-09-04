@@ -23,7 +23,7 @@ def preprocess_image(image_path, input_shape):
 import numpy as np
 from PIL import Image
 
-def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.25, mask_thresh=0.5):
+def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.5, mask_thresh=0.5):
     """
     Count foreground pixels in YOLOv11n-seg masks using NumPy + PIL only.
 
