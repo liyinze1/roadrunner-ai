@@ -44,9 +44,11 @@ def main():
     inference_time = time() - start
 
     # Get and process output
-    output_data = interpreter.get_tensor(output_details[0]['index'])
+    output = interpreter.get_tensor(output_details[0]['index'])
+    proto = interpreter.get_tensor(output_details[1]['index']) 
     
-    print(f'Output shape: {output_data.shape}')
+    print(f'Output shape: {output.shape}')
+    print(f'Proto shape: {proto.shape}')
     
     # process segmentation output
     
