@@ -4,7 +4,7 @@ from time import time
 from tflite_runtime.interpreter import Interpreter
 
 # Load TFLite model
-interpreter = Interpreter(model_path='models/water_float16.tflite')
+interpreter = Interpreter(model_path='models/water_float32.tflite')
 interpreter.allocate_tensors()
 
 # Get input/output details
@@ -84,7 +84,7 @@ def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.
 
     return sum(pixel_counts) / (H_img * W_img)
 
-def extract_binary_masks(output, proto, image_size, conf_thresh=0.25, mask_thresh=0.5):
+def extract_binary_masks(output, proto, image_size, conf_thresh=0.5, mask_thresh=0.5):
     output = output[0]
     total_channels = output.shape[0]
     num_mask_coeffs = total_channels - 6  # 4 bbox + 1 obj + 1 cls
