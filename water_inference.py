@@ -84,6 +84,59 @@ def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.
 
     return sum(pixel_counts) / (H_img * W_img)
 
+def extract_binary_masks(output, proto, image_size, conf_thresh=0.25, mask_thresh=0.5):
+    output = output[0]
+    total_channels = output.shape[0]
+    num_mask_coeffs = total_channels - 6  # 4 bbox + 1 obj + 1 cls
+
+    objectness = output[4, :]
+    class_conf = output[5, :]
+    mask_coeffs_all = output[6:6+num_mask_coeffs, :].T
+
+    conf = objectness * class_conf
+    keep = conf > conf_thresh
+    mask_coeffs = mask_coeffs_all[keep]
+
+    if mask_coeffs.shape[0] == 0:
+        return []
+
+    # Trim proto channels to match coeffs if needed
+    if proto.shape[2] > mask_coeffs.shape[1]:
+        proto = proto[:, :, :mask_coeffs.shape[1]]
+    elif proto.shape[2] < mask_coeffs.shape[1]:
+        raise ValueError('mask_coeffs > proto channels')
+
+    proto_flat = proto.reshape(-1, mask_coeffs.shape[1])
+    masks = np.dot(mask_coeffs, proto_flat.T)
+    masks = 1 / (1 + np.exp(-masks))  # sigmoid
+    H_proto, W_proto = proto.shape[:2]
+    masks = masks.reshape(-1, H_proto, W_proto)
+
+    # Resize to image size and binarize
+    H_img, W_img = image_size
+    binary_masks = []
+    for i in range(masks.shape[0]):
+        pil_mask = Image.fromarray((masks[i] * 255).astype(np.uint8))
+        pil_resized = pil_mask.resize((W_img, H_img), resample=Image.BILINEAR)
+        mask_resized_np = np.array(pil_resized) / 255.0
+        binary_mask = (mask_resized_np > mask_thresh).astype(np.uint8)
+        binary_masks.append(binary_mask)
+
+    return binary_masks  # list of (H, W) binary np.uint8 masks
+
+def save_combined_mask(masks, output_path='combined_mask.png'):
+    if not masks:
+        print('No masks to save.')
+        return
+
+    combined = np.zeros_like(masks[0], dtype=np.uint8)
+    for i, mask in enumerate(masks):
+        combined += mask * (i + 1)  # Assign each mask a unique label
+
+    # Convert to color (optional)
+    img = Image.fromarray(combined * 40)  # scale to make mask visible
+    img.save(output_path)
+    print(f'Saved combined mask to: {output_path}')
 
 
 def main():
@@ -105,6 +158,9 @@ def main():
     print(f'Output shape: {output.shape}')
     print(f'Proto shape: {proto.shape}')
     print(f'Pixel counts: {pixel_counts}')
+    
+    masks = extract_binary_masks(output, proto, image_size=(640, 640))
+    save_combined_mask(masks, output_path='combined_mask.png')
     
 
     inference_time = time() - start
