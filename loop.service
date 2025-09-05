@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/bin/bash /home/acme/roadrunner-ai/loop_shutdown.sh
+ExecStart=/bin/bash /home/acme/roadrunner-ai/loop.sh
 WorkingDirectory=/home/acme/roadrunner-ai
 Restart=no
 

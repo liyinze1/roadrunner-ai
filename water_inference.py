@@ -153,14 +153,14 @@ def main():
     output = np.array(output)
     proto = np.array(proto)[0]  # remove batch → (160, 160, 32)
 
-    pixel_counts = count_mask_pixels_from_yolo_output(output, proto, image_size=(640, 640))
+    # pixel_counts = count_mask_pixels_from_yolo_output(output, proto, image_size=(640, 640))
     
-    print(f'Output shape: {output.shape}')
-    print(f'Proto shape: {proto.shape}')
-    print(f'Pixel counts: {pixel_counts}')
+    # print(f'Output shape: {output.shape}')
+    # print(f'Proto shape: {proto.shape}')
+    # print(f'Pixel counts: {pixel_counts}')
     
-    masks = extract_binary_masks(output, proto, image_size=(640, 640))
-    save_combined_mask(masks, output_path='combined_mask.png')
+    # masks = extract_binary_masks(output, proto, image_size=(640, 640))
+    # save_combined_mask(masks, output_path='combined_mask.png')
     
 
     inference_time = time() - start
