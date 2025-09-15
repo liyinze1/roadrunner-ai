@@ -159,8 +159,8 @@ def main():
     # print(f'Proto shape: {proto.shape}')
     # print(f'Pixel counts: {pixel_counts}')
     
-    # masks = extract_binary_masks(output, proto, image_size=(640, 640))
-    # save_combined_mask(masks, output_path='combined_mask.png')
+    masks = extract_binary_masks(output, proto, image_size=(640, 640))
+    save_combined_mask(masks, output_path='mask.png')
     
 
     inference_time = time() - start
