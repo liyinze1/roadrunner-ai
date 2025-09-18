@@ -61,7 +61,7 @@ class YOLOv11Segmentation:
         
         # Calculate scale factors
         
-        return image_array, (1, 1)
+        return image_array
     
     def postprocess_detections(self, outputs):
         """
