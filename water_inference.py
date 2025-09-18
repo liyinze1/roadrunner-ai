@@ -12,12 +12,10 @@ class YOLOv11Segmentation:
             model_path: Path to the .tflite model file
             conf_threshold: Confidence threshold for detections
             iou_threshold: IoU threshold for NMS
-            low_memory_mode: Enable memory optimizations for embedded devices
             max_image_size: Maximum image dimension for low memory mode
         """
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
-        self.low_memory_mode = low_memory_mode
         
         # Load TFLite model
         self.interpreter = tflite.Interpreter(model_path=model_path)
@@ -72,10 +70,6 @@ class YOLOv11Segmentation:
         scale_x, scale_y = scale_factors
         detections = []
         
-        if not self.low_memory_mode:
-            print(f"Number of outputs: {len(outputs)}")
-            for i, output in enumerate(outputs):
-                print(f"Output {i} shape: {output.shape}")
         
         # Extract outputs with memory management
         detection_output = outputs[0][0]  # (37, 8400)
@@ -83,15 +77,11 @@ class YOLOv11Segmentation:
         
         # Transpose detection output
         if detection_output.shape[0] < detection_output.shape[1]:
-            if not self.low_memory_mode:
-                print("Transposing detection output from (37, 8400) to (8400, 37)")
             detection_output = detection_output.T
         
-        if not self.low_memory_mode:
-            print(f"After transpose - Detection output shape: {detection_output.shape}")
         
         # Process detections in chunks to save memory
-        chunk_size = 1000 if self.low_memory_mode else 8400
+        chunk_size = 8400 # 1000
         num_detections = detection_output.shape[0]
         
         for chunk_start in range(0, num_detections, chunk_size):
@@ -138,8 +128,6 @@ class YOLOv11Segmentation:
                                                                x_center_px + width_px/2, y_center_px + height_px/2),
                                                               scale_factors)
                         except Exception as e:
-                            if not self.low_memory_mode:  # Only print warnings in verbose mode
-                                print(f"Warning: Mask generation failed for detection {actual_i}: {e}")
                             mask = None
                     
                     detections.append({
@@ -150,8 +138,8 @@ class YOLOv11Segmentation:
                     })
             
             # Force garbage collection after each chunk
-            if self.low_memory_mode:
-                gc.collect()
+
+            gc.collect()
         
         print(f"Total valid detections: {len(detections)}")
         return detections
