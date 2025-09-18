@@ -20,8 +20,6 @@ def preprocess_image(image_path, input_shape):
     image_np = np.array(image, dtype=np.float32) / 255.0
     image_np = np.expand_dims(image_np, axis=0)
     return image_np
-import numpy as np
-from PIL import Image
 
 def count_mask_pixels_from_yolo_output(output, proto, image_size, conf_thresh=0.5, mask_thresh=0.5):
     """

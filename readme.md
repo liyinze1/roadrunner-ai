@@ -36,11 +36,11 @@ Give permission
 sudo chmod 666 /dev/gpiochip0
 sudo gpioinfo gpiochip0
 ```
-|Pin|Switch|Comment|
+<!-- |Pin|Switch|Comment|
 |-|-|-|
 | PA11  | S1  | Photovoltaic Measurement
 | PA13  | S2  | Open-circuit Feature
-| PA17  | S3  | Sensor Power Switch
+| PA17  | S3  | Sensor Power Switch -->
 
 
 ### Run the loop service
