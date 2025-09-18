@@ -13,7 +13,6 @@ class YOLOv11Segmentation:
             model_path: Path to the .tflite model file
             conf_threshold: Confidence threshold for detections
             iou_threshold: IoU threshold for NMS
-            low_memory_mode: Enable memory optimizations for embedded devices
             max_image_size: Maximum image dimension for low memory mode
         """
         self.conf_threshold = conf_threshold
@@ -295,7 +294,7 @@ class YOLOv11Segmentation:
         
         return filtered_detections
     
-    def visualize_masks(self, detections, image_height=640, image_width=640, class_names=None, save_path=None):
+    def visualize_masks(self, detections, image_height=640, image_width=640, save_path=None):
         """
         Memory-optimized mask visualization
         """
@@ -354,16 +353,14 @@ def main():
     detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
-    class_names = ['water']
-    
     yolo.visualize_masks(
         detections,
-        class_names=class_names, 
         save_path="water_segmentation_result.jpg"
     )
     
     print("Water segmentation inference completed successfully!")
     print("Result images saved: water_segmentation_result.jpg")
+    print(f"Total time: {time.time() - t:.2f} seconds")
 
 if __name__ == "__main__":
     main()
