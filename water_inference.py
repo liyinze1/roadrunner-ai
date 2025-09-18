@@ -65,6 +65,7 @@ class YOLOv11Segmentation:
         # Convert to numpy array with memory efficiency
         image_array = np.array(resized_image, dtype=np.float32)
         del resized_image  # Free memory immediately
+        del original_image
         gc.collect()
         
         # Normalize
@@ -75,7 +76,7 @@ class YOLOv11Segmentation:
         scale_x = orig_width / self.input_width
         scale_y = orig_height / self.input_height
         
-        return image_array, original_image, (scale_x, scale_y)
+        return image_array, (scale_x, scale_y)
     
     def postprocess_detections(self, outputs, scale_factors):
         """
@@ -295,7 +296,7 @@ class YOLOv11Segmentation:
             original_image: Original input image
         """
         # Preprocess image
-        preprocessed_image, original_image, scale_factors = self.preprocess_image(image_path)
+        preprocessed_image, scale_factors = self.preprocess_image(image_path)
         
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
@@ -315,62 +316,19 @@ class YOLOv11Segmentation:
         # Apply NMS
         filtered_detections = self.apply_nms(detections)
         
-        return filtered_detections, original_image
+        return filtered_detections
     
-    def visualize_masks(self, detections, image, class_names=None, save_path=None, save_mask_only=False):
+    def visualize_masks(self, detections, image_height=640, image_width=640, class_names=None, save_path=None):
         """
         Memory-optimized mask visualization
         """
-        print(f"Original image size: {image.size}")
         
         if len(detections) == 0:
             print("No detections found")
-            if save_path:
-                image.save(save_path)
-            return image
-        
-        # Work with smaller arrays in low memory mode
-        if self.low_memory_mode:
-            # Process masks one by one to save memory
-            result_image = image.copy()
-            draw = ImageDraw.Draw(result_image)
-            
-            for i, det in enumerate(detections):
-                x1, y1, x2, y2 = det['bbox']
-                conf = det['confidence']
-                
-                # Draw simple bounding boxes in low memory mode
-                water_color = (0, 255, 255)
-                line_width = 3
-                for offset in range(line_width):
-                    draw.rectangle([x1-offset, y1-offset, x2+offset, y2+offset], 
-                                 outline=water_color, width=1)
-                
-                # Add label
-                label = f"water: {conf:.2f}"
-                try:
-                    font = ImageFont.load_default()
-                    bbox = draw.textbbox((0, 0), label, font=font)
-                    text_width = bbox[2] - bbox[0]
-                    text_height = bbox[3] - bbox[1]
-                except:
-                    text_width, text_height = len(label) * 8, 16
-                
-                label_bg = [x1, y1 - text_height - 4, x1 + text_width + 4, y1]
-                draw.rectangle(label_bg, fill=water_color)
-                draw.text((x1 + 2, y1 - text_height - 2), label, fill=(0, 0, 0), font=font)
-                
-                print(f"Detection {i+1}: water, conf={conf:.3f}, bbox=({x1},{y1},{x2},{y2})")
-            
-            if save_path:
-                result_image.save(save_path)
-                print(f"Result saved to: {save_path}")
-            
-            return result_image
-        
+            return None
         else:
             # Full mask visualization for devices with more memory
-            mask_overlay = np.zeros((image.height, image.width, 3), dtype=np.uint8)
+            mask_overlay = np.zeros((image_height, image_width, 3), dtype=np.uint8)
             water_color = np.array([0, 255, 255], dtype=np.uint8)
             
             for i, det in enumerate(detections):
@@ -382,8 +340,8 @@ class YOLOv11Segmentation:
                 
                 if mask is not None and mask.size > 0:
                     mask_h, mask_w = mask.shape
-                    end_y = min(y1 + mask_h, image.height)
-                    end_x = min(x1 + mask_w, image.width)
+                    end_y = min(y1 + mask_h, image_height)
+                    end_x = min(x1 + mask_w, image_width)
                     actual_h = end_y - y1
                     actual_w = end_x - x1
                     
@@ -399,60 +357,10 @@ class YOLOv11Segmentation:
                         
                         print(f"  Mask applied to region: ({x1},{y1}) to ({end_x},{end_y})")
             
-            if save_mask_only:
-                result_image = Image.fromarray(mask_overlay)
-            else:
-                # Blend with original
-                original_array = np.array(image)
-                alpha = 0.5
-                mask_pixels = np.any(mask_overlay > 0, axis=2)
-                blended = original_array.copy()
-                blended[mask_pixels] = (alpha * original_array[mask_pixels] + 
-                                      (1 - alpha) * mask_overlay[mask_pixels]).astype(np.uint8)
-                result_image = Image.fromarray(blended)
-            
-            if save_path:
-                result_image.save(save_path)
-                print(f"Result saved to: {save_path}")
-                if not save_mask_only:
-                    mask_only_path = save_path.replace('.jpg', '_mask_only.jpg')
-                    Image.fromarray(mask_overlay).save(mask_only_path)
-                    print(f"Mask-only saved to: {mask_only_path}")
-            
-                return result_image
-            else:
-                print(f"  Warning: No valid mask found")
-        
-        if save_mask_only:
-            # Save only the mask
-            result_image = Image.fromarray(mask_overlay)
-        else:
-            # Blend mask with original image
-            original_array = np.array(image)
-            
-            # Create alpha blending (50% transparency)
-            alpha = 0.5
-            mask_pixels = np.any(mask_overlay > 0, axis=2)  # Where mask exists
-            
-            blended = original_array.copy()
-            blended[mask_pixels] = (alpha * original_array[mask_pixels] + 
-                                  (1 - alpha) * mask_overlay[mask_pixels]).astype(np.uint8)
-            
-            result_image = Image.fromarray(blended)
-        
-        # Save image if path provided
-        if save_path:
-            result_image.save(save_path)
-            print(f"Result saved to: {save_path}")
-            
-            # Also save mask-only version
-            if not save_mask_only:
-                mask_only_path = save_path.replace('.jpg', '_mask_only.jpg')
-                mask_only_image = Image.fromarray(mask_overlay)
-                mask_only_image.save(mask_only_path)
-                print(f"Mask-only version saved to: {mask_only_path}")
-        
-        return result_image
+
+        result_image = Image.fromarray(mask_overlay)
+        result_image.save(save_path)
+        return 0
 
 
 # Example usage
@@ -463,15 +371,14 @@ def main():
     
     # Run inference
     image_path = "water.jpg"  # Update this path
-    detections, original_image = yolo.predict(image_path)
+    detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
     class_names = ['water']
     
     # This will create both blended image and mask-only versions
     result_image = yolo.visualize_masks(
-        detections, 
-        original_image, 
+        detections,
         class_names, 
         save_path="water_segmentation_result.jpg"
     )
