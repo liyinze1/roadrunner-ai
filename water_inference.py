@@ -5,7 +5,7 @@ import gc  # For garbage collection
 
 class YOLOv11Segmentation:
     def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
-                 low_memory_mode=False, max_image_size=1024):
+                 low_memory_mode=True, max_image_size=1024):
         """
         Initialize YOLOv11 segmentation model
         
