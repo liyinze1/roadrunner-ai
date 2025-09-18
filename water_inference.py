@@ -63,7 +63,7 @@ class YOLOv11Segmentation:
         
         return image_array, (1, 1)
     
-    def postprocess_detections(self, outputs, scale_factors):
+    def postprocess_detections(self, outputs):
         """
         Memory-optimized post-processing of YOLOv11 outputs
         """
@@ -271,7 +271,7 @@ class YOLOv11Segmentation:
             original_image: Original input image
         """
         # Preprocess image
-        preprocessed_image, scale_factors = self.preprocess_image(image_path)
+        preprocessed_image = self.preprocess_image(image_path)
         
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
@@ -286,7 +286,7 @@ class YOLOv11Segmentation:
             outputs.append(output_data)
         
         # Post-process results
-        detections = self.postprocess_detections(outputs, scale_factors)
+        detections = self.postprocess_detections(outputs)
         
         # Apply NMS
         filtered_detections = self.apply_nms(detections)
