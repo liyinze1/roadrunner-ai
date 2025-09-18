@@ -208,8 +208,8 @@ class YOLOv11Segmentation:
                 return np.ones((10, 10), dtype=np.uint8)
             
             # Final resize to target size
-            target_w = max(10, int((x2_model - x1_model) * scale_x))
-            target_h = max(10, int((y2_model - y1_model) * scale_y))
+            target_w = max(10, int(x2_model - x1_model))
+            target_h = max(10, int(y2_model - y1_model))
             
             mask_crop_pil = Image.fromarray((mask_crop * 255).astype(np.uint8))
             del mask_crop
