@@ -13,7 +13,6 @@ class YOLOv11Segmentation:
             model_path: Path to the .tflite model file
             conf_threshold: Confidence threshold for detections
             iou_threshold: IoU threshold for NMS
-            max_image_size: Maximum image dimension for low memory mode
         """
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
@@ -68,9 +67,7 @@ class YOLOv11Segmentation:
         Memory-optimized post-processing of YOLOv11 outputs
         """
         detections = []
-        
 
-        
         # Extract outputs with memory management
         detection_output = outputs[0][0]  # (37, 8400)
         mask_protos = outputs[1][0]  # Always extract mask prototypes for segmentation

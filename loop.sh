@@ -1,29 +1,27 @@
-# initialize camera
+#!/bin/bash
 sudo media-ctl -d /dev/media0 --set-v4l2 '4:0[fmt:SBGGR8_1X8/1280x720@1/30 field:none colorspace:srgb xfer:srgb ycbcr:601 quantization:full-range]'
 sudo media-ctl -d /dev/media0 --set-v4l2 '"atmel_isc_scaler":0[fmt:SBGGR8_1X8/1280x720 field:none colorspace:srgb]'
 sudo v4l2-ctl -v pixelformat=RGBP,height=720,width=1280
 
-# take a photo
-sleep 0.5
-sudo fswebcam -i 0 -p RGB565 -r 1280x720 tinyRGB565.png
+while true; do
+    # Read GPIO line 107 on gpiochip0
+    value=$(sudo gpioget gpiochip0 103) # PD7
 
-# inference
-sudo -u "acme" python3 water_inference.py
+    if [ "$value" -eq 0 ]; then
+        echo "GPIO 107 is LOW → Taking photo..."
 
-# suspend to ram
-echo "finished inference, suspending now..."
-sudo bash sleep_modes/suspend_to_ram.sh 9999
+        sleep 0.5
 
-# wake up here
-echo "wake up from suspend"
+        # Capture image with timestamp in filename
+        filename="/home/acme/roadrunner-ai/photos/$(date +%Y%m%d_%H%M%S).jpg"
+        sudo fswebcam -i 0 -p RGB565 -r 1280x720 "$filename"
 
-# take a photo
-sleep 0.5
-sudo fswebcam -i 0 -p RGB565 -r 1280x720 tinyRGB565.png
+        echo "Saved $filename"
+        
+        # Optional: wait a bit before checking again
+        sleep 1
+    fi
 
-# inference
-sudo -u "acme" python3 water_inference.py
-
-# power off
-echo "going to shutdown now..."
-sudo poweroff
+    # Polling delay (adjust as needed)
+    sleep 1
+done
