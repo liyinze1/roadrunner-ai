@@ -295,46 +295,45 @@ class YOLOv11Segmentation:
     
     def visualize_masks(self, detections, image_height=640, image_width=640, save_path=None):
         """
-        Memory-optimized mask visualization
+        Generate grayscale mask image (0 = background, 255 = object)
         """
-        
         if len(detections) == 0:
-            print("No detections found")
+            print('No detections found')
             return None
-        else:
-            # Full mask visualization for devices with more memory
-            mask_overlay = np.zeros((image_height, image_width, 3), dtype=np.uint8)
-            water_color = np.array([0, 255, 255], dtype=np.uint8)
-            
-            for i, det in enumerate(detections):
-                x1, y1, x2, y2 = det['bbox']
-                conf = det['confidence']
-                mask = det['mask']
-                
-                print(f"Detection {i+1}: water, conf={conf:.3f}, bbox=({x1},{y1},{x2},{y2})")
-                
-                if mask is not None and mask.size > 0:
-                    mask_h, mask_w = mask.shape
-                    end_y = min(y1 + mask_h, image_height)
-                    end_x = min(x1 + mask_w, image_width)
-                    actual_h = end_y - y1
-                    actual_w = end_x - x1
-                    
-                    if actual_h > 0 and actual_w > 0:
-                        if mask_h != actual_h or mask_w != actual_w:
-                            mask_pil = Image.fromarray((mask * 255).astype(np.uint8))
-                            mask_resized = mask_pil.resize((actual_w, actual_h), Image.LANCZOS)
-                            mask = (np.array(mask_resized) > 127).astype(np.uint8)
-                        
-                        mask_region = mask_overlay[y1:end_y, x1:end_x]
-                        for c in range(3):
-                            mask_region[:, :, c] = np.where(mask > 0, water_color[c], mask_region[:, :, c])
-                        
-                        print(f"  Mask applied to region: ({x1},{y1}) to ({end_x},{end_y})")
-            
-        result_image = Image.fromarray(mask_overlay)
-        result_image.save(save_path)
+
+        # Single-channel grayscale mask
+        mask_overlay = np.zeros((image_height, image_width), dtype=np.uint8)
+
+        for i, det in enumerate(detections):
+            x1, y1, x2, y2 = det['bbox']
+            conf = det['confidence']
+            mask = det['mask']
+
+            print(f'Detection {i+1}: water, conf={conf:.3f}, bbox=({x1},{y1},{x2},{y2})')
+
+            if mask is not None and mask.size > 0:
+                mask_h, mask_w = mask.shape
+                end_y = min(y1 + mask_h, image_height)
+                end_x = min(x1 + mask_w, image_width)
+                actual_h = end_y - y1
+                actual_w = end_x - x1
+
+                if actual_h > 0 and actual_w > 0:
+                    if mask_h != actual_h or mask_w != actual_w:
+                        mask_pil = Image.fromarray((mask * 255).astype(np.uint8))
+                        mask_resized = mask_pil.resize((actual_w, actual_h), Image.LANCZOS)
+                        mask = (np.array(mask_resized) > 127).astype(np.uint8)
+
+                    # Paste mask into overlay (set detected regions to 255)
+                    mask_overlay[y1:end_y, x1:end_x] = np.where(mask > 0, 255, mask_overlay[y1:end_y, x1:end_x])
+
+                    print(f'  Mask applied to region: ({x1},{y1}) to ({end_x},{end_y})')
+
+        result_image = Image.fromarray(mask_overlay, mode='L')  # 'L' = 8-bit grayscale
+        if save_path:
+            result_image.save(save_path)
         return 0
+
 
 
 # Example usage
