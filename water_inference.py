@@ -5,7 +5,7 @@ import gc  # For garbage collection
 
 class YOLOv11Segmentation:
     def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
-                 low_memory_mode=True, max_image_size=1024):
+                 low_memory_mode=False, max_image_size=1024):
         """
         Initialize YOLOv11 segmentation model
         
@@ -91,7 +91,7 @@ class YOLOv11Segmentation:
         
         # Extract outputs with memory management
         detection_output = outputs[0][0]  # (37, 8400)
-        mask_protos = outputs[1][0] if not self.low_memory_mode else None  # (160, 160, 32)
+        mask_protos = outputs[1][0]  # Always extract mask prototypes for segmentation
         
         # Transpose detection output
         if detection_output.shape[0] < detection_output.shape[1]:
@@ -140,9 +140,9 @@ class YOLOv11Segmentation:
                 box_width = x2 - x1
                 box_height = y2 - y1
                 if box_width > 10 and box_height > 10:
-                    # Generate mask only if not in low memory mode or if detection is high confidence
+                    # Generate mask for all valid detections in low memory mode
                     mask = None
-                    if not self.low_memory_mode and mask_protos is not None and confidence > 0.7:
+                    if mask_protos is not None and confidence > 0.5:  # Lower threshold for mask generation
                         try:
                             mask_coeffs = detection[5:37]
                             mask = self.generate_mask_optimized(mask_coeffs, mask_protos, 
@@ -150,7 +150,8 @@ class YOLOv11Segmentation:
                                                                x_center_px + width_px/2, y_center_px + height_px/2),
                                                               scale_factors)
                         except Exception as e:
-                            print(f"Warning: Mask generation failed for detection {actual_i}: {e}")
+                            if not self.low_memory_mode:  # Only print warnings in verbose mode
+                                print(f"Warning: Mask generation failed for detection {actual_i}: {e}")
                             mask = None
                     
                     detections.append({
