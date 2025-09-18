@@ -332,7 +332,7 @@ class YOLOv11Segmentation:
         result_image = Image.fromarray(mask_overlay, mode='L')  # 'L' = 8-bit grayscale
         if save_path:
             result_image.save(save_path)
-        return result_image
+        return 0
 
 
 
