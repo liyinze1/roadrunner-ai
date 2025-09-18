@@ -90,86 +90,79 @@ class YOLOv11Segmentation:
         for i, output in enumerate(outputs):
             print(f"Output {i} shape: {output.shape}")
         
-        # YOLOv11 segmentation typically has multiple outputs:
-        # Output 0: Detection results [batch, num_detections, 6] for single class
-        # Output 1: Segmentation masks or coefficients
-        
-        # Use the first output for detections
+        # YOLOv11 detection output format analysis
         detection_output = outputs[0][0]  # Remove batch dimension
         print(f"Detection output shape: {detection_output.shape}")
+        
+        # Your model outputs (1, 37, 8400) - need to transpose to (8400, 37)
+        if detection_output.shape[0] < detection_output.shape[1]:
+            print("Transposing detection output from (37, 8400) to (8400, 37)")
+            detection_output = detection_output.T  # Transpose to (8400, 37)
+        
+        print(f"After transpose - Detection output shape: {detection_output.shape}")
         print(f"First few detections raw data:")
-        print(detection_output[:5])  # Print first 5 detections for debugging
+        print(detection_output[:3, :6])  # Print first 3 detections, first 6 values each
         
-        # YOLOv11 output might be in format: [x_center, y_center, width, height, confidence, class]
-        # or [x1, y1, x2, y2, confidence, class] depending on the model
-        
-        num_detections = detection_output.shape[0]
-        num_values_per_detection = detection_output.shape[1] if len(detection_output.shape) > 1 else len(detection_output)
+        num_detections = detection_output.shape[0]  # Should be 8400
+        num_values_per_detection = detection_output.shape[1]  # Should be 37
         
         print(f"Number of detections: {num_detections}")
         print(f"Values per detection: {num_values_per_detection}")
         
-        # Handle different output formats
-        if len(detection_output.shape) == 1:
-            # Single detection format
-            detection_output = detection_output.reshape(1, -1)
+        # YOLOv11 format: [x_center, y_center, width, height, confidence, class_prob(s), mask_coefficients...]
+        # For single class + segmentation: [x, y, w, h, conf, class_conf, 32_mask_coeffs] = 38 total
+        # But yours has 37, so might be: [x, y, w, h, conf, 32_mask_coeffs] = 37 total
         
         for i, detection in enumerate(detection_output):
-            if len(detection) < 5:
-                continue
+            if num_values_per_detection >= 5:
+                # Extract coordinates and confidence
+                x_center, y_center, width, height = detection[0:4]
+                confidence = detection[4]
                 
-            # Try different coordinate interpretations
-            if num_values_per_detection >= 6:
-                # Format: [x_center, y_center, width, height, confidence, class]
-                x_center, y_center, width, height, confidence = detection[0:5]
-                class_id = int(detection[5]) if len(detection) > 5 else 0
+                # Debug first few detections
+                if i < 3:
+                    print(f"Detection {i}: x={x_center:.3f}, y={y_center:.3f}, w={width:.3f}, h={height:.3f}, conf={confidence:.3f}")
+                
+                if confidence < self.conf_threshold:
+                    continue
+                
+                # Convert from normalized coordinates (0-1) to pixel coordinates
+                # YOLOv11 typically outputs normalized coordinates
+                x_center_px = x_center * 640  # Model input size
+                y_center_px = y_center * 640
+                width_px = width * 640
+                height_px = height * 640
                 
                 # Convert center format to corner format
-                x1 = (x_center - width/2) * scale_x
-                y1 = (y_center - height/2) * scale_y
-                x2 = (x_center + width/2) * scale_x
-                y2 = (y_center + height/2) * scale_y
+                x1 = (x_center_px - width_px/2) * scale_x
+                y1 = (y_center_px - height_px/2) * scale_y
+                x2 = (x_center_px + width_px/2) * scale_x
+                y2 = (y_center_px + height_px/2) * scale_y
                 
-            elif num_values_per_detection == 5:
-                # Format: [x1, y1, x2, y2, confidence] or [x_center, y_center, width, height, confidence]
-                # Try to determine which format by looking at values
-                if detection[2] < detection[0] or detection[3] < detection[1]:
-                    # Likely center format (width/height smaller than center coordinates)
-                    x_center, y_center, width, height, confidence = detection[0:5]
-                    x1 = (x_center - width/2) * scale_x
-                    y1 = (y_center - height/2) * scale_y
-                    x2 = (x_center + width/2) * scale_x
-                    y2 = (y_center + height/2) * scale_y
-                else:
-                    # Likely corner format
-                    x1, y1, x2, y2, confidence = detection[0:5]
-                    x1 *= scale_x
-                    y1 *= scale_y
-                    x2 *= scale_x
-                    y2 *= scale_y
+                # Debug coordinate conversion for first few detections
+                if i < 3:
+                    print(f"  Normalized: center=({x_center:.3f},{y_center:.3f}), size=({width:.3f},{height:.3f})")
+                    print(f"  Pixel coords: center=({x_center_px:.1f},{y_center_px:.1f}), size=({width_px:.1f},{height_px:.1f})")
+                    print(f"  Final bbox: ({x1:.1f},{y1:.1f},{x2:.1f},{y2:.1f})")
                 
-                class_id = 0  # Single class model
-            else:
-                continue
-            
-            # Debug print for first few detections
-            if i < 3:
-                print(f"Detection {i}: raw={detection[:6]}")
-                print(f"  Parsed: conf={confidence:.3f}, class={class_id}, bbox=({x1:.1f},{y1:.1f},{x2:.1f},{y2:.1f})")
-            
-            if confidence < self.conf_threshold:
-                continue
-            
-            # Ensure coordinates are valid
-            x1, y1, x2, y2 = max(0, x1), max(0, y1), max(x1+1, x2), max(y1+1, y2)
-            
-            detections.append({
-                'bbox': [int(x1), int(y1), int(x2), int(y2)],
-                'confidence': float(confidence),
-                'class_id': int(class_id),
-                'mask': None
-            })
+                # Ensure coordinates are valid and within image bounds
+                x1 = max(0, min(x1, scale_x * 640))
+                y1 = max(0, min(y1, scale_y * 640))
+                x2 = max(x1 + 1, min(x2, scale_x * 640))
+                y2 = max(y1 + 1, min(y2, scale_y * 640))
+                
+                # Only keep detections with reasonable size
+                box_width = x2 - x1
+                box_height = y2 - y1
+                if box_width > 5 and box_height > 5:  # Minimum 5 pixel box
+                    detections.append({
+                        'bbox': [int(x1), int(y1), int(x2), int(y2)],
+                        'confidence': float(confidence),
+                        'class_id': 0,  # Single class: water
+                        'mask': None
+                    })
         
+        print(f"Total valid detections after filtering: {len(detections)}")
         return detections
     
     def apply_nms(self, detections):
