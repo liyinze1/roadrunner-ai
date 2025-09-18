@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import tflite_runtime.interpreter as tflite
 import gc  # For garbage collection
-
+import time
 class YOLOv11Segmentation:
     def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
                  low_memory_mode=True, max_image_size=1024):
@@ -366,27 +366,28 @@ class YOLOv11Segmentation:
 # Example usage
 def main():
     # Initialize model
-    model_path = "models/water_float32.tflite"  # Update this path
+    
+    t = time.time()
+    
+    model_path = "models/water_float32.tflite"
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
-    image_path = "water.jpg"  # Update this path
+    image_path = "water.jpg"
     detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
     class_names = ['water']
     
-    # This will create both blended image and mask-only versions
-    result_image = yolo.visualize_masks(
+    yolo.visualize_masks(
         detections,
         class_names=class_names, 
         save_path="water_segmentation_result.jpg"
     )
     
     print("Water segmentation inference completed successfully!")
-    print("Result images saved:")
-    print("- 'water_segmentation_result.jpg' (blended with original)")
-    print("- 'water_segmentation_result_mask_only.jpg' (mask only)")
+    print("Result images saved: water_segmentation_result.jpg")
+    print(f"Total inference time: {time.time() - t:.2f} seconds")
 
 if __name__ == "__main__":
     main()
