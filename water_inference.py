@@ -127,8 +127,7 @@ class YOLOv11Segmentation:
                             mask_coeffs = detection[5:37]
                             mask = self.generate_mask_optimized(mask_coeffs, mask_protos, 
                                                               (x_center_px - width_px/2, y_center_px - height_px/2,
-                                                               x_center_px + width_px/2, y_center_px + height_px/2),
-                                                              (1, 1))
+                                                               x_center_px + width_px/2, y_center_px + height_px/2))
                         except Exception as e:
                             print(f"Warning: Mask generation failed for detection {actual_i}: {e}")
                             mask = None
@@ -146,7 +145,7 @@ class YOLOv11Segmentation:
         print(f"Total valid detections: {len(detections)}")
         return detections
     
-    def generate_mask_optimized(self, mask_coeffs, mask_protos, bbox_model_space, scale_factors):
+    def generate_mask_optimized(self, mask_coeffs, mask_protos, bbox_model_space):
         """
         Memory-optimized mask generation
         """
