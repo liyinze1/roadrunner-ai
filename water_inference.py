@@ -1,10 +1,11 @@
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import tflite_runtime.interpreter as tflite
-import time
+import gc  # For garbage collection
 
 class YOLOv11Segmentation:
-    def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7):
+    def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
+                 low_memory_mode=False, max_image_size=1024):
         """
         Initialize YOLOv11 segmentation model
         
@@ -12,9 +13,13 @@ class YOLOv11Segmentation:
             model_path: Path to the .tflite model file
             conf_threshold: Confidence threshold for detections
             iou_threshold: IoU threshold for NMS
+            low_memory_mode: Enable memory optimizations for embedded devices
+            max_image_size: Maximum image dimension for low memory mode
         """
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
+        self.low_memory_mode = low_memory_mode
+        self.max_image_size = max_image_size
         
         # Load TFLite model
         self.interpreter = tflite.Interpreter(model_path=model_path)
@@ -24,29 +29,20 @@ class YOLOv11Segmentation:
         self.input_details = self.interpreter.get_input_details()
         self.output_details = self.interpreter.get_output_details()
         
-        # Get input shape (typically [1, height, width, 3] for YOLOv11)
+        # Get input shape
         self.input_shape = self.input_details[0]['shape']
         self.input_height = self.input_shape[1]
         self.input_width = self.input_shape[2]
         
-        print(f"Model loaded successfully")
+        print(f"Model loaded successfully (Low memory mode: {low_memory_mode})")
         print(f"Input shape: {self.input_shape}")
-        print(f"Input dtype: {self.input_details[0]['dtype']}")
-        print(f"Number of outputs: {len(self.output_details)}")
+        print(f"Max image size: {max_image_size if low_memory_mode else 'Unlimited'}")
         
     def preprocess_image(self, image_path):
         """
-        Preprocess input image for YOLOv11
-        
-        Args:
-            image_path: Path to input image or PIL Image object
-            
-        Returns:
-            preprocessed_image: Normalized image array
-            original_image: Original PIL image
-            scale_factor: Scaling factors for coordinate conversion
+        Memory-optimized image preprocessing
         """
-        # Load image
+        # Load and potentially resize image for memory efficiency
         if isinstance(image_path, str):
             original_image = Image.open(image_path).convert('RGB')
         else:
@@ -54,19 +50,28 @@ class YOLOv11Segmentation:
             
         orig_width, orig_height = original_image.size
         
-        # Resize image to model input size
+        # Resize large images in low memory mode
+        if self.low_memory_mode and (orig_width > self.max_image_size or orig_height > self.max_image_size):
+            ratio = min(self.max_image_size / orig_width, self.max_image_size / orig_height)
+            new_width = int(orig_width * ratio)
+            new_height = int(orig_height * ratio)
+            print(f"Resizing image from {orig_width}x{orig_height} to {new_width}x{new_height} for memory efficiency")
+            original_image = original_image.resize((new_width, new_height), Image.LANCZOS)
+            orig_width, orig_height = new_width, new_height
+        
+        # Resize to model input size
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
         
-        # Convert to numpy array and normalize
+        # Convert to numpy array with memory efficiency
         image_array = np.array(resized_image, dtype=np.float32)
+        del resized_image  # Free memory immediately
+        gc.collect()
         
-        # YOLOv11 typically expects input in range [0, 1]
+        # Normalize
         image_array = image_array / 255.0
-        
-        # Add batch dimension
         image_array = np.expand_dims(image_array, axis=0)
         
-        # Calculate scale factors for coordinate conversion
+        # Calculate scale factors
         scale_x = orig_width / self.input_width
         scale_y = orig_height / self.input_height
         
@@ -74,162 +79,152 @@ class YOLOv11Segmentation:
     
     def postprocess_detections(self, outputs, scale_factors):
         """
-        Post-process YOLOv11 outputs to extract detections and masks
-        
-        Args:
-            outputs: Model outputs
-            scale_factors: Scaling factors for coordinate conversion
-            
-        Returns:
-            detections: List of detection dictionaries
+        Memory-optimized post-processing of YOLOv11 outputs
         """
         scale_x, scale_y = scale_factors
         detections = []
         
-        # Debug: Print output information
-        print(f"Number of outputs: {len(outputs)}")
-        for i, output in enumerate(outputs):
-            print(f"Output {i} shape: {output.shape}")
+        if not self.low_memory_mode:
+            print(f"Number of outputs: {len(outputs)}")
+            for i, output in enumerate(outputs):
+                print(f"Output {i} shape: {output.shape}")
         
-        # Extract detection and mask outputs
-        detection_output = outputs[0][0]  # Remove batch dimension: (37, 8400)
-        mask_protos = outputs[1][0]       # Remove batch dimension: (160, 160, 32)
+        # Extract outputs with memory management
+        detection_output = outputs[0][0]  # (37, 8400)
+        mask_protos = outputs[1][0] if not self.low_memory_mode else None  # (160, 160, 32)
         
-        print(f"Detection output shape: {detection_output.shape}")
-        print(f"Mask prototypes shape: {mask_protos.shape}")
-        
-        # Transpose detection output from (37, 8400) to (8400, 37)
+        # Transpose detection output
         if detection_output.shape[0] < detection_output.shape[1]:
-            print("Transposing detection output from (37, 8400) to (8400, 37)")
+            if not self.low_memory_mode:
+                print("Transposing detection output from (37, 8400) to (8400, 37)")
             detection_output = detection_output.T
         
-        print(f"After transpose - Detection output shape: {detection_output.shape}")
+        if not self.low_memory_mode:
+            print(f"After transpose - Detection output shape: {detection_output.shape}")
         
-        num_detections = detection_output.shape[0]  # 8400
-        num_values_per_detection = detection_output.shape[1]  # 37
+        # Process detections in chunks to save memory
+        chunk_size = 1000 if self.low_memory_mode else 8400
+        num_detections = detection_output.shape[0]
         
-        print(f"Number of detections: {num_detections}")
-        print(f"Values per detection: {num_values_per_detection}")
-        
-        # YOLOv11 segmentation format: [x, y, w, h, conf, 32_mask_coefficients]
-        # Total: 4 + 1 + 32 = 37 values per detection
-        
-        for i, detection in enumerate(detection_output):
-            if num_values_per_detection >= 37:
-                # Extract coordinates, confidence, and mask coefficients
+        for chunk_start in range(0, num_detections, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, num_detections)
+            detection_chunk = detection_output[chunk_start:chunk_end]
+            
+            for i, detection in enumerate(detection_chunk):
+                actual_i = chunk_start + i
+                
+                # Extract coordinates and confidence
                 x_center, y_center, width, height = detection[0:4]
                 confidence = detection[4]
-                mask_coeffs = detection[5:37]  # 32 mask coefficients
-                
-                # Debug first few detections
-                if i < 3 and confidence > 0.1:
-                    print(f"Detection {i}: x={x_center:.3f}, y={y_center:.3f}, w={width:.3f}, h={height:.3f}, conf={confidence:.3f}")
-                    print(f"  First few mask coeffs: {mask_coeffs[:5]}")
                 
                 if confidence < self.conf_threshold:
                     continue
                 
-                # Convert from normalized coordinates to pixel coordinates
-                x_center_px = x_center * 640  # Model input size
+                # Convert coordinates efficiently
+                x_center_px = x_center * 640
                 y_center_px = y_center * 640
                 width_px = width * 640
                 height_px = height * 640
                 
-                # Convert center format to corner format in model space
-                x1_model = x_center_px - width_px/2
-                y1_model = y_center_px - height_px/2
-                x2_model = x_center_px + width_px/2
-                y2_model = y_center_px + height_px/2
+                x1 = (x_center_px - width_px/2) * scale_x
+                y1 = (y_center_px - height_px/2) * scale_y
+                x2 = (x_center_px + width_px/2) * scale_x
+                y2 = (y_center_px + height_px/2) * scale_y
                 
-                # Scale to original image space
-                x1 = x1_model * scale_x
-                y1 = y1_model * scale_y
-                x2 = x2_model * scale_x
-                y2 = y2_model * scale_y
-                
-                # Generate mask using mask coefficients and prototypes
-                mask = self.generate_mask(mask_coeffs, mask_protos, 
-                                        (x1_model, y1_model, x2_model, y2_model), 
-                                        scale_factors)
-                
-                # Ensure coordinates are valid
+                # Bounds checking
                 x1 = max(0, min(x1, scale_x * 640))
                 y1 = max(0, min(y1, scale_y * 640))
                 x2 = max(x1 + 1, min(x2, scale_x * 640))
                 y2 = max(y1 + 1, min(y2, scale_y * 640))
                 
-                # Only keep detections with reasonable size
                 box_width = x2 - x1
                 box_height = y2 - y1
                 if box_width > 10 and box_height > 10:
+                    # Generate mask only if not in low memory mode or if detection is high confidence
+                    mask = None
+                    if not self.low_memory_mode and mask_protos is not None and confidence > 0.7:
+                        try:
+                            mask_coeffs = detection[5:37]
+                            mask = self.generate_mask_optimized(mask_coeffs, mask_protos, 
+                                                              (x_center_px - width_px/2, y_center_px - height_px/2,
+                                                               x_center_px + width_px/2, y_center_px + height_px/2),
+                                                              scale_factors)
+                        except Exception as e:
+                            print(f"Warning: Mask generation failed for detection {actual_i}: {e}")
+                            mask = None
+                    
                     detections.append({
                         'bbox': [int(x1), int(y1), int(x2), int(y2)],
                         'confidence': float(confidence),
-                        'class_id': 0,  # Single class: water
+                        'class_id': 0,
                         'mask': mask
                     })
+            
+            # Force garbage collection after each chunk
+            if self.low_memory_mode:
+                gc.collect()
         
-        print(f"Total valid detections after filtering: {len(detections)}")
+        print(f"Total valid detections: {len(detections)}")
         return detections
     
-    def generate_mask(self, mask_coeffs, mask_protos, bbox_model_space, scale_factors):
+    def generate_mask_optimized(self, mask_coeffs, mask_protos, bbox_model_space, scale_factors):
         """
-        Generate segmentation mask from coefficients and prototypes
-        
-        Args:
-            mask_coeffs: Mask coefficients from detection (32 values)
-            mask_protos: Mask prototypes (160, 160, 32)
-            bbox_model_space: Bounding box in model coordinate space
-            scale_factors: Scale factors for resizing
+        Memory-optimized mask generation
+        """
+        try:
+            scale_x, scale_y = scale_factors
             
-        Returns:
-            mask: Binary mask in original image size
-        """
-        scale_x, scale_y = scale_factors
-        
-        # Compute mask by multiplying coefficients with prototypes
-        # mask_protos: (160, 160, 32), mask_coeffs: (32,)
-        mask_160 = np.dot(mask_protos, mask_coeffs)  # Result: (160, 160)
-        
-        # Apply sigmoid activation to get probabilities
-        mask_160 = 1 / (1 + np.exp(-mask_160))
-        
-        # Resize mask from 160x160 to 640x640 (model input size)
-        from PIL import Image
-        mask_pil = Image.fromarray((mask_160 * 255).astype(np.uint8))
-        mask_640 = mask_pil.resize((640, 640), Image.LANCZOS)
-        mask_640_np = np.array(mask_640) / 255.0
-        
-        # Crop mask to bounding box region in model space
-        x1_model, y1_model, x2_model, y2_model = bbox_model_space
-        x1_model = int(max(0, min(x1_model, 640)))
-        y1_model = int(max(0, min(y1_model, 640)))
-        x2_model = int(max(x1_model, min(x2_model, 640)))
-        y2_model = int(max(y1_model, min(y2_model, 640)))
-        
-        # Extract mask region
-        mask_crop = mask_640_np[y1_model:y2_model, x1_model:x2_model]
-        
-        if mask_crop.size == 0:
-            # If crop is empty, return small dummy mask
-            mask_crop = np.ones((10, 10))
-        
-        # Resize cropped mask to original image bounding box size
-        crop_h, crop_w = mask_crop.shape
-        target_w = int((x2_model - x1_model) * scale_x)
-        target_h = int((y2_model - y1_model) * scale_y)
-        
-        if target_w > 0 and target_h > 0:
+            # Compute mask with reduced precision for memory efficiency
+            mask_160 = np.dot(mask_protos, mask_coeffs.astype(np.float32))
+            mask_160 = 1 / (1 + np.exp(-mask_160))
+            
+            # Work with smaller intermediate arrays
+            x1_model, y1_model, x2_model, y2_model = bbox_model_space
+            x1_model = int(max(0, min(x1_model, 640)))
+            y1_model = int(max(0, min(y1_model, 640)))
+            x2_model = int(max(x1_model, min(x2_model, 640)))
+            y2_model = int(max(y1_model, min(y2_model, 640)))
+            
+            # Resize only the needed portion
+            mask_pil = Image.fromarray((mask_160 * 255).astype(np.uint8))
+            del mask_160  # Free memory immediately
+            
+            # Resize in steps to reduce memory usage
+            mask_320 = mask_pil.resize((320, 320), Image.LANCZOS)
+            del mask_pil
+            mask_640 = mask_320.resize((640, 640), Image.LANCZOS)
+            del mask_320
+            
+            mask_640_np = np.array(mask_640, dtype=np.uint8) / 255.0
+            del mask_640
+            
+            # Extract and resize crop
+            mask_crop = mask_640_np[y1_model:y2_model, x1_model:x2_model]
+            del mask_640_np
+            
+            if mask_crop.size == 0:
+                return np.ones((10, 10), dtype=np.uint8)
+            
+            # Final resize to target size
+            target_w = max(10, int((x2_model - x1_model) * scale_x))
+            target_h = max(10, int((y2_model - y1_model) * scale_y))
+            
             mask_crop_pil = Image.fromarray((mask_crop * 255).astype(np.uint8))
+            del mask_crop
             mask_resized = mask_crop_pil.resize((target_w, target_h), Image.LANCZOS)
-            final_mask = np.array(mask_resized) / 255.0
-        else:
-            final_mask = mask_crop
-        
-        # Threshold to get binary mask
-        final_mask = (final_mask > 0.5).astype(np.uint8)
-        
-        return final_mask
+            del mask_crop_pil
+            
+            final_mask = np.array(mask_resized, dtype=np.uint8)
+            del mask_resized
+            
+            # Threshold to binary
+            final_mask = (final_mask > 127).astype(np.uint8)
+            
+            return final_mask
+            
+        except Exception as e:
+            print(f"Error in mask generation: {e}")
+            return np.ones((10, 10), dtype=np.uint8)
     
     def apply_nms(self, detections):
         """
@@ -323,72 +318,107 @@ class YOLOv11Segmentation:
     
     def visualize_masks(self, detections, image, class_names=None, save_path=None, save_mask_only=False):
         """
-        Visualize segmentation masks on image using PIL
-        
-        Args:
-            detections: List of detection results with masks
-            image: PIL Image
-            class_names: List of class names (optional)
-            save_path: Path to save the result image (optional)
-            save_mask_only: If True, save only the mask without original image
-            
-        Returns:
-            result_image: PIL Image with mask visualizations
+        Memory-optimized mask visualization
         """
         print(f"Original image size: {image.size}")
         
         if len(detections) == 0:
-            print("No detections found - saving original image")
+            print("No detections found")
             if save_path:
                 image.save(save_path)
             return image
         
-        # Create mask overlay
-        mask_overlay = np.zeros((image.height, image.width, 3), dtype=np.uint8)
-        
-        print(f"Found {len(detections)} detections with masks:")
-        
-        # Water color: bright cyan/blue
-        water_color = np.array([0, 255, 255], dtype=np.uint8)  # Cyan for water
-        
-        for i, det in enumerate(detections):
-            x1, y1, x2, y2 = det['bbox']
-            conf = det['confidence']
-            mask = det['mask']
-            class_name = class_names[0] if class_names else "water"
+        # Work with smaller arrays in low memory mode
+        if self.low_memory_mode:
+            # Process masks one by one to save memory
+            result_image = image.copy()
+            draw = ImageDraw.Draw(result_image)
             
-            print(f"Detection {i+1}:")
-            print(f"  Class: {class_name}")
-            print(f"  Confidence: {conf:.3f}")
-            print(f"  BBox: ({x1}, {y1}, {x2}, {y2})")
-            print(f"  Mask shape: {mask.shape if mask is not None else 'None'}")
+            for i, det in enumerate(detections):
+                x1, y1, x2, y2 = det['bbox']
+                conf = det['confidence']
+                
+                # Draw simple bounding boxes in low memory mode
+                water_color = (0, 255, 255)
+                line_width = 3
+                for offset in range(line_width):
+                    draw.rectangle([x1-offset, y1-offset, x2+offset, y2+offset], 
+                                 outline=water_color, width=1)
+                
+                # Add label
+                label = f"water: {conf:.2f}"
+                try:
+                    font = ImageFont.load_default()
+                    bbox = draw.textbbox((0, 0), label, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    text_height = bbox[3] - bbox[1]
+                except:
+                    text_width, text_height = len(label) * 8, 16
+                
+                label_bg = [x1, y1 - text_height - 4, x1 + text_width + 4, y1]
+                draw.rectangle(label_bg, fill=water_color)
+                draw.text((x1 + 2, y1 - text_height - 2), label, fill=(0, 0, 0), font=font)
+                
+                print(f"Detection {i+1}: water, conf={conf:.3f}, bbox=({x1},{y1},{x2},{y2})")
             
-            if mask is not None and mask.size > 0:
-                # Place mask in the correct position on the full image
-                mask_h, mask_w = mask.shape
+            if save_path:
+                result_image.save(save_path)
+                print(f"Result saved to: {save_path}")
+            
+            return result_image
+        
+        else:
+            # Full mask visualization for devices with more memory
+            mask_overlay = np.zeros((image.height, image.width, 3), dtype=np.uint8)
+            water_color = np.array([0, 255, 255], dtype=np.uint8)
+            
+            for i, det in enumerate(detections):
+                x1, y1, x2, y2 = det['bbox']
+                conf = det['confidence']
+                mask = det['mask']
                 
-                # Ensure mask fits within bounding box
-                end_y = min(y1 + mask_h, image.height)
-                end_x = min(x1 + mask_w, image.width)
-                actual_h = end_y - y1
-                actual_w = end_x - x1
+                print(f"Detection {i+1}: water, conf={conf:.3f}, bbox=({x1},{y1},{x2},{y2})")
                 
-                if actual_h > 0 and actual_w > 0:
-                    # Resize mask if needed to fit exactly in bounding box
-                    if mask_h != actual_h or mask_w != actual_w:
-                        mask_pil = Image.fromarray((mask * 255).astype(np.uint8))
-                        mask_resized = mask_pil.resize((actual_w, actual_h), Image.LANCZOS)
-                        mask = np.array(mask_resized) / 255.0
-                        mask = (mask > 0.5).astype(np.uint8)
+                if mask is not None and mask.size > 0:
+                    mask_h, mask_w = mask.shape
+                    end_y = min(y1 + mask_h, image.height)
+                    end_x = min(x1 + mask_w, image.width)
+                    actual_h = end_y - y1
+                    actual_w = end_x - x1
                     
-                    # Apply mask to overlay
-                    mask_region = mask_overlay[y1:end_y, x1:end_x]
-                    for c in range(3):
-                        mask_region[:, :, c] = np.where(mask > 0, water_color[c], mask_region[:, :, c])
-                    
-                    print(f"  Mask applied to region: ({x1},{y1}) to ({end_x},{end_y})")
-                else:
-                    print(f"  Warning: Invalid mask region")
+                    if actual_h > 0 and actual_w > 0:
+                        if mask_h != actual_h or mask_w != actual_w:
+                            mask_pil = Image.fromarray((mask * 255).astype(np.uint8))
+                            mask_resized = mask_pil.resize((actual_w, actual_h), Image.LANCZOS)
+                            mask = (np.array(mask_resized) > 127).astype(np.uint8)
+                        
+                        mask_region = mask_overlay[y1:end_y, x1:end_x]
+                        for c in range(3):
+                            mask_region[:, :, c] = np.where(mask > 0, water_color[c], mask_region[:, :, c])
+                        
+                        print(f"  Mask applied to region: ({x1},{y1}) to ({end_x},{end_y})")
+            
+            if save_mask_only:
+                result_image = Image.fromarray(mask_overlay)
+            else:
+                # Blend with original
+                original_array = np.array(image)
+                alpha = 0.5
+                mask_pixels = np.any(mask_overlay > 0, axis=2)
+                blended = original_array.copy()
+                blended[mask_pixels] = (alpha * original_array[mask_pixels] + 
+                                      (1 - alpha) * mask_overlay[mask_pixels]).astype(np.uint8)
+                result_image = Image.fromarray(blended)
+            
+            if save_path:
+                result_image.save(save_path)
+                print(f"Result saved to: {save_path}")
+                if not save_mask_only:
+                    mask_only_path = save_path.replace('.jpg', '_mask_only.jpg')
+                    Image.fromarray(mask_overlay).save(mask_only_path)
+                    print(f"Mask-only saved to: {mask_only_path}")
+            
+                return result_image
             else:
                 print(f"  Warning: No valid mask found")
         
@@ -427,8 +457,6 @@ class YOLOv11Segmentation:
 # Example usage
 def main():
     # Initialize model
-    now = time.time()
-    
     model_path = "models/water_float32.tflite"  # Update this path
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
@@ -451,8 +479,6 @@ def main():
     print("Result images saved:")
     print("- 'water_segmentation_result.jpg' (blended with original)")
     print("- 'water_segmentation_result_mask_only.jpg' (mask only)")
-    
-    print(f"Total time: {time.time() - now:.2f} seconds")
-    
+
 if __name__ == "__main__":
     main()
