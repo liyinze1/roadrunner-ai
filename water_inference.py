@@ -5,7 +5,7 @@ import gc  # For garbage collection
 import time
 class YOLOv11Segmentation:
     def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
-                 low_memory_mode=True, max_image_size=1024):
+                 max_image_size=1024):
         """
         Initialize YOLOv11 segmentation model
         
@@ -18,7 +18,6 @@ class YOLOv11Segmentation:
         """
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
-        self.low_memory_mode = low_memory_mode
         self.max_image_size = max_image_size
         
         # Load TFLite model
@@ -34,9 +33,8 @@ class YOLOv11Segmentation:
         self.input_height = self.input_shape[1]
         self.input_width = self.input_shape[2]
         
-        print(f"Model loaded successfully (Low memory mode: {low_memory_mode})")
+        print(f"Model loaded successfully)")
         print(f"Input shape: {self.input_shape}")
-        print(f"Max image size: {max_image_size if low_memory_mode else 'Unlimited'}")
         
     def preprocess_image(self, image_path):
         """
@@ -48,17 +46,7 @@ class YOLOv11Segmentation:
         else:
             original_image = image_path.convert('RGB')
             
-        orig_width, orig_height = original_image.size
-        
-        # Resize large images in low memory mode
-        # if self.low_memory_mode and (orig_width > self.max_image_size or orig_height > self.max_image_size):
-        #     ratio = min(self.max_image_size / orig_width, self.max_image_size / orig_height)
-        #     new_width = int(orig_width * ratio)
-        #     new_height = int(orig_height * ratio)
-        #     print(f"Resizing image from {orig_width}x{orig_height} to {new_width}x{new_height} for memory efficiency")
-        #     original_image = original_image.resize((new_width, new_height), Image.LANCZOS)
-        #     orig_width, orig_height = new_width, new_height
-        
+
         # Resize to model input size
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
         
@@ -82,10 +70,7 @@ class YOLOv11Segmentation:
         """
         detections = []
         
-        if not self.low_memory_mode:
-            print(f"Number of outputs: {len(outputs)}")
-            for i, output in enumerate(outputs):
-                print(f"Output {i} shape: {output.shape}")
+
         
         # Extract outputs with memory management
         detection_output = outputs[0][0]  # (37, 8400)
@@ -93,15 +78,13 @@ class YOLOv11Segmentation:
         
         # Transpose detection output
         if detection_output.shape[0] < detection_output.shape[1]:
-            if not self.low_memory_mode:
-                print("Transposing detection output from (37, 8400) to (8400, 37)")
+            print("Transposing detection output from (37, 8400) to (8400, 37)")
             detection_output = detection_output.T
         
-        if not self.low_memory_mode:
-            print(f"After transpose - Detection output shape: {detection_output.shape}")
+        print(f"After transpose - Detection output shape: {detection_output.shape}")
         
         # Process detections in chunks to save memory
-        chunk_size = 1000 if self.low_memory_mode else 8400
+        chunk_size = 8400
         num_detections = detection_output.shape[0]
         
         for chunk_start in range(0, num_detections, chunk_size):
@@ -148,8 +131,7 @@ class YOLOv11Segmentation:
                                                                x_center_px + width_px/2, y_center_px + height_px/2),
                                                               (1, 1))
                         except Exception as e:
-                            if not self.low_memory_mode:  # Only print warnings in verbose mode
-                                print(f"Warning: Mask generation failed for detection {actual_i}: {e}")
+                            print(f"Warning: Mask generation failed for detection {actual_i}: {e}")
                             mask = None
                     
                     detections.append({
@@ -160,8 +142,7 @@ class YOLOv11Segmentation:
                     })
             
             # Force garbage collection after each chunk
-            if self.low_memory_mode:
-                gc.collect()
+            gc.collect()
         
         print(f"Total valid detections: {len(detections)}")
         return detections
