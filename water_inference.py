@@ -149,7 +149,7 @@ class YOLOv11Segmentation:
                             mask = self.generate_mask_optimized(mask_coeffs, mask_protos, 
                                                               (x_center_px - width_px/2, y_center_px - height_px/2,
                                                                x_center_px + width_px/2, y_center_px + height_px/2),
-                                                              scale_factors)
+                                                              )
                         except Exception as e:
                             if not self.low_memory_mode:  # Only print warnings in verbose mode
                                 print(f"Warning: Mask generation failed for detection {actual_i}: {e}")
