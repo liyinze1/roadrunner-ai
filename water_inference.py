@@ -379,7 +379,7 @@ def main():
     # This will create both blended image and mask-only versions
     result_image = yolo.visualize_masks(
         detections,
-        class_names, 
+        class_names=class_names, 
         save_path="water_segmentation_result.jpg"
     )
     
