@@ -328,7 +328,7 @@ class YOLOv11Segmentation:
             return None
         else:
             # Full mask visualization for devices with more memory
-            mask_overlay = np.zeros((image_height, image_width, 3) , dtype=np.uint8)
+            mask_overlay = np.zeros((image_height, image_width, 3), dtype=np.uint8)
             water_color = np.array([0, 255, 255], dtype=np.uint8)
             
             for i, det in enumerate(detections):
