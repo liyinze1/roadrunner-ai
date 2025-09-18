@@ -51,13 +51,13 @@ class YOLOv11Segmentation:
         orig_width, orig_height = original_image.size
         
         # Resize large images in low memory mode
-        # if self.low_memory_mode and (orig_width > self.max_image_size or orig_height > self.max_image_size):
-        #     ratio = min(self.max_image_size / orig_width, self.max_image_size / orig_height)
-        #     new_width = int(orig_width * ratio)
-        #     new_height = int(orig_height * ratio)
-        #     print(f"Resizing image from {orig_width}x{orig_height} to {new_width}x{new_height} for memory efficiency")
-        #     original_image = original_image.resize((new_width, new_height), Image.LANCZOS)
-        #     orig_width, orig_height = new_width, new_height
+        if self.low_memory_mode and (orig_width > self.max_image_size or orig_height > self.max_image_size):
+            ratio = min(self.max_image_size / orig_width, self.max_image_size / orig_height)
+            new_width = int(orig_width * ratio)
+            new_height = int(orig_height * ratio)
+            print(f"Resizing image from {orig_width}x{orig_height} to {new_width}x{new_height} for memory efficiency")
+            original_image = original_image.resize((new_width, new_height), Image.LANCZOS)
+            orig_width, orig_height = new_width, new_height
         
         # Resize to model input size
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
