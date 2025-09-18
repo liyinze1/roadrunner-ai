@@ -72,17 +72,12 @@ class YOLOv11Segmentation:
         image_array = image_array / 255.0
         image_array = np.expand_dims(image_array, axis=0)
         
-        # Calculate scale factors
-        scale_x = orig_width / self.input_width
-        scale_y = orig_height / self.input_height
-        
-        return image_array, (1, 1)
+        return image_array
     
-    def postprocess_detections(self, outputs, scale_factors):
+    def postprocess_detections(self, outputs):
         """
         Memory-optimized post-processing of YOLOv11 outputs
         """
-        scale_x, scale_y = scale_factors
         detections = []
         
         if not self.low_memory_mode:
@@ -127,16 +122,16 @@ class YOLOv11Segmentation:
                 width_px = width * 640
                 height_px = height * 640
                 
-                x1 = (x_center_px - width_px/2) * scale_x
-                y1 = (y_center_px - height_px/2) * scale_y
-                x2 = (x_center_px + width_px/2) * scale_x
-                y2 = (y_center_px + height_px/2) * scale_y
+                x1 = (x_center_px - width_px/2)
+                y1 = (y_center_px - height_px/2)
+                x2 = (x_center_px + width_px/2)
+                y2 = (y_center_px + height_px/2)
                 
                 # Bounds checking
-                x1 = max(0, min(x1, scale_x * 640))
-                y1 = max(0, min(y1, scale_y * 640))
-                x2 = max(x1 + 1, min(x2, scale_x * 640))
-                y2 = max(y1 + 1, min(y2, scale_y * 640))
+                x1 = max(0, min(x1, 640))
+                y1 = max(0, min(y1, 640))
+                x2 = max(x1 + 1, min(x2, 640))
+                y2 = max(y1 + 1, min(y2, 640))
                 
                 box_width = x2 - x1
                 box_height = y2 - y1
@@ -169,12 +164,11 @@ class YOLOv11Segmentation:
         print(f"Total valid detections: {len(detections)}")
         return detections
     
-    def generate_mask_optimized(self, mask_coeffs, mask_protos, bbox_model_space, scale_factors):
+    def generate_mask_optimized(self, mask_coeffs, mask_protos, bbox_model_space):
         """
         Memory-optimized mask generation
         """
         try:
-            scale_x, scale_y = scale_factors
             
             # Compute mask with reduced precision for memory efficiency
             mask_160 = np.dot(mask_protos, mask_coeffs.astype(np.float32))
@@ -208,8 +202,8 @@ class YOLOv11Segmentation:
                 return np.ones((10, 10), dtype=np.uint8)
             
             # Final resize to target size
-            target_w = max(10, int((x2_model - x1_model) * scale_x))
-            target_h = max(10, int((y2_model - y1_model) * scale_y))
+            target_w = max(10, int((x2_model - x1_model)))
+            target_h = max(10, int((y2_model - y1_model)))
             
             mask_crop_pil = Image.fromarray((mask_crop * 255).astype(np.uint8))
             del mask_crop
@@ -296,7 +290,7 @@ class YOLOv11Segmentation:
             original_image: Original input image
         """
         # Preprocess image
-        preprocessed_image, scale_factors = self.preprocess_image(image_path)
+        preprocessed_image = self.preprocess_image(image_path)
         
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
@@ -311,7 +305,7 @@ class YOLOv11Segmentation:
             outputs.append(output_data)
         
         # Post-process results
-        detections = self.postprocess_detections(outputs, scale_factors)
+        detections = self.postprocess_detections(outputs)
         
         # Apply NMS
         filtered_detections = self.apply_nms(detections)
