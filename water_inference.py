@@ -4,8 +4,7 @@ import tflite_runtime.interpreter as tflite
 import gc  # For garbage collection
 import time
 class YOLOv11Segmentation:
-    def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
-                 low_memory_mode=True, max_image_size=1024):
+    def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7):
         """
         Initialize YOLOv11 segmentation model
         
@@ -19,7 +18,6 @@ class YOLOv11Segmentation:
         self.conf_threshold = conf_threshold
         self.iou_threshold = iou_threshold
         self.low_memory_mode = low_memory_mode
-        self.max_image_size = max_image_size
         
         # Load TFLite model
         self.interpreter = tflite.Interpreter(model_path=model_path)
@@ -34,9 +32,7 @@ class YOLOv11Segmentation:
         self.input_height = self.input_shape[1]
         self.input_width = self.input_shape[2]
         
-        print(f"Model loaded successfully (Low memory mode: {low_memory_mode})")
         print(f"Input shape: {self.input_shape}")
-        print(f"Max image size: {max_image_size if low_memory_mode else 'Unlimited'}")
         
     def preprocess_image(self, image_path):
         """
@@ -49,15 +45,6 @@ class YOLOv11Segmentation:
             original_image = image_path.convert('RGB')
             
         orig_width, orig_height = original_image.size
-        
-        # Resize large images in low memory mode
-        if self.low_memory_mode and (orig_width > self.max_image_size or orig_height > self.max_image_size):
-            ratio = min(self.max_image_size / orig_width, self.max_image_size / orig_height)
-            new_width = int(orig_width * ratio)
-            new_height = int(orig_height * ratio)
-            print(f"Resizing image from {orig_width}x{orig_height} to {new_width}x{new_height} for memory efficiency")
-            original_image = original_image.resize((new_width, new_height), Image.LANCZOS)
-            orig_width, orig_height = new_width, new_height
         
         # Resize to model input size
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
