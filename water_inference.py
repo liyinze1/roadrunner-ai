@@ -61,9 +61,9 @@ class YOLOv11Segmentation:
         
         # Calculate scale factors
         
-        return image_array
+        return image_array, (1, 1)
     
-    def postprocess_detections(self, outputs):
+    def postprocess_detections(self, outputs, scale_factors):
         """
         Memory-optimized post-processing of YOLOv11 outputs
         """
@@ -146,7 +146,7 @@ class YOLOv11Segmentation:
         print(f"Total valid detections: {len(detections)}")
         return detections
     
-    def generate_mask_optimized(self, mask_coeffs, mask_protos, bbox_model_space):
+    def generate_mask_optimized(self, mask_coeffs, mask_protos, bbox_model_space, scale_factors):
         """
         Memory-optimized mask generation
         """
@@ -272,7 +272,7 @@ class YOLOv11Segmentation:
             original_image: Original input image
         """
         # Preprocess image
-        preprocessed_image = self.preprocess_image(image_path)
+        preprocessed_image, scale_factors = self.preprocess_image(image_path)
         
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
@@ -287,7 +287,7 @@ class YOLOv11Segmentation:
             outputs.append(output_data)
         
         # Post-process results
-        detections = self.postprocess_detections(outputs)
+        detections = self.postprocess_detections(outputs, scale_factors)
         
         # Apply NMS
         filtered_detections = self.apply_nms(detections)
