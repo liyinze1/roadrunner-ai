@@ -127,16 +127,16 @@ class YOLOv11Segmentation:
                 width_px = width * 640
                 height_px = height * 640
                 
-                x1 = (x_center_px - width_px/2) * scale_x
-                y1 = (y_center_px - height_px/2) * scale_y
-                x2 = (x_center_px + width_px/2) * scale_x
-                y2 = (y_center_px + height_px/2) * scale_y
+                x1 = (x_center_px - width_px/2)
+                y1 = (y_center_px - height_px/2)
+                x2 = (x_center_px + width_px/2)
+                y2 = (y_center_px + height_px/2)
                 
                 # Bounds checking
-                x1 = max(0, min(x1, scale_x * 640))
-                y1 = max(0, min(y1, scale_y * 640))
-                x2 = max(x1 + 1, min(x2, scale_x * 640))
-                y2 = max(y1 + 1, min(y2, scale_y * 640))
+                x1 = max(0, min(x1, 640))
+                y1 = max(0, min(y1, 640))
+                x2 = max(x1 + 1, min(x2, 640))
+                y2 = max(y1 + 1, min(y2, 640))
                 
                 box_width = x2 - x1
                 box_height = y2 - y1
@@ -208,8 +208,8 @@ class YOLOv11Segmentation:
                 return np.ones((10, 10), dtype=np.uint8)
             
             # Final resize to target size
-            target_w = max(10, int((x2_model - x1_model) * scale_x))
-            target_h = max(10, int((y2_model - y1_model) * scale_y))
+            target_w = max(10, int(x2_model - x1_model))
+            target_h = max(10, int(y2_model - y1_model))
             
             mask_crop_pil = Image.fromarray((mask_crop * 255).astype(np.uint8))
             del mask_crop
