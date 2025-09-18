@@ -73,8 +73,6 @@ class YOLOv11Segmentation:
         image_array = np.expand_dims(image_array, axis=0)
         
         # Calculate scale factors
-        scale_x = orig_width / self.input_width
-        scale_y = orig_height / self.input_height
         
         return image_array, (1, 1)
     
@@ -82,7 +80,6 @@ class YOLOv11Segmentation:
         """
         Memory-optimized post-processing of YOLOv11 outputs
         """
-        scale_x, scale_y = scale_factors
         detections = []
         
         if not self.low_memory_mode:
@@ -174,7 +171,6 @@ class YOLOv11Segmentation:
         Memory-optimized mask generation
         """
         try:
-            scale_x, scale_y = scale_factors
             
             # Compute mask with reduced precision for memory efficiency
             mask_160 = np.dot(mask_protos, mask_coeffs.astype(np.float32))
