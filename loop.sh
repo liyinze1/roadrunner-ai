@@ -1,7 +1,8 @@
 #!/bin/bash
-sudo media-ctl -d /dev/media0 --set-v4l2 '4:0[fmt:SBGGR8_1X8/1280x720@1/30 field:none colorspace:srgb xfer:srgb ycbcr:601 quantization:full-range]'
-sudo media-ctl -d /dev/media0 --set-v4l2 '"atmel_isc_scaler":0[fmt:SBGGR8_1X8/1280x720 field:none colorspace:srgb]'
-sudo v4l2-ctl -v pixelformat=RGBP,height=720,width=1280
+sudo media-ctl -d /dev/media0 --set-v4l2 '4:0[fmt:SBGGR8_1X8/1920x1080@1/30 field:none colorspace:srgb xfer:srgb ycbcr:601 quantization:full-range]'
+sudo media-ctl -d /dev/media0 --set-v4l2 '"atmel_isc_scaler":0[fmt:SBGGR8_1X8/1920x1080 field:none colorspace:srgb]'
+sudo v4l2-ctl -v pixelformat=RGBP,height=1080,width=1920
+sudo v4l2-ctl  --set-parm=15
 
 while true; do
     # Read GPIO line 107 on gpiochip0
@@ -13,8 +14,8 @@ while true; do
         sleep 0.5
 
         # Capture image with timestamp in filename
-        filename="/home/acme/roadrunner-ai/photos/$(date +%Y%m%d_%H%M%S).jpg"
-        sudo fswebcam -i 0 -p RGB565 -r 1280x720 "$filename"
+        filename="/home/acme/roadrunner-ai/photos/$(date +%Y%m%d_%H%M%S).png"
+        sudo fswebcam -i 0 -p RGB565 -r 1920x1080 -S 20 --no-banner "$filename"
 
         echo "Saved $filename"
         
