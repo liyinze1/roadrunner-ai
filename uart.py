@@ -40,5 +40,5 @@ if __name__ == '__main__':
             depth = int(input('Enter depth: '))
             uart.send_depth(depth)
         except:
-            break
+            exit(1)
         
