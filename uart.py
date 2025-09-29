@@ -37,9 +37,6 @@ class uart_connection:
 if __name__ == '__main__':
     uart = uart_connection()
     while True:
-        try:
-            depth = int(input('Enter depth: '))
-            uart.send_depth(depth)
-        except:
-            exit(1)
+        depth = int(input('Enter depth: '))
+        uart.send_depth(depth)
         
