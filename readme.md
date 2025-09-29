@@ -33,6 +33,7 @@ https://www.acmesystems.it/roadrunner_isc
 Give permission
 
 ```
+sudo chmod 666 /dev/ttyS1
 sudo chmod 666 /dev/gpiochip0
 sudo gpioinfo gpiochip0
 ```
