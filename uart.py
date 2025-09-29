@@ -8,6 +8,7 @@ class uart_connection:
         self.receive_thread = threading.Thread(target=self.receive)
         self.receive_thread.start()
         self.ack_received = threading.Event()
+        self.stop_recive = threading.Event()
         self.timeout = timeout
                 
     def send_depth(self, depth):
@@ -15,6 +16,13 @@ class uart_connection:
     
     def send_photo(self, data):
         return self._send(b'P' + int.to_bytes(len(data), 2, 'big') + data)
+    
+    def reqest_sleep(self):
+        self.stop_recive.set()
+        self.receive_thread.join()
+        self._send(b'S')
+        sleep_mode = self.uart.read(1)
+        print('Sleep mode:', sleep_mode)
         
     def _send(self, data):
         self.uart.write(data)
@@ -26,13 +34,11 @@ class uart_connection:
             return False
         
     def receive(self):
-        while True:
+        while self.stop_recive.is_set() is False:
             c = self.uart.read(1)
             print('uart get', c)
             if c == b'A':
                 self.ack_received.set()
-            elif c == b'N':
-                print('Error received!')
                 
 if __name__ == '__main__':
     uart = uart_connection()
