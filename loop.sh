@@ -10,7 +10,9 @@ while true; do
     filename="/home/acme/roadrunner-ai/photos/$(date +%Y%m%d_%H%M%S).png"
     sudo fswebcam -i 0 -p RGB565 -r 1920x1080 -S 20 --no-banner "$filename"
 
-    sudo -u "acme" python3 water_inference.py "$filename"
+    # sudo -u "acme" python3 loop.py "$filename"
+
+    sudo -u "acme" python3 water_inference.py
 
     sudo poweroff
 
