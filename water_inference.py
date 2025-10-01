@@ -334,7 +334,7 @@ class YOLOv11Segmentation:
 
 
 # Example usage
-def main():
+def main(image_path = "water.jpg"):
     # Initialize model
     
     t = time.time()
@@ -343,7 +343,7 @@ def main():
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
-    image_path = "water.jpg"
+    
     detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
@@ -355,6 +355,8 @@ def main():
     print("Water segmentation inference completed successfully!")
     print("Result images saved: water_segmentation_result.jpg")
     print(f"Total time: {time.time() - t:.2f} seconds")
+    
+    return 0
 
 if __name__ == "__main__":
     main()
