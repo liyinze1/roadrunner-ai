@@ -3,3 +3,5 @@ venv/
 runs/
 test.ipynb
 .vscode/
+photos/
+__pycache__/
