@@ -347,10 +347,10 @@ def main(image_path = "water.jpg"):
     detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
-    yolo.visualize_masks(
-        detections,
-        save_path="water_segmentation_result.jpg"
-    )
+    # yolo.visualize_masks(
+    #     detections,
+    #     save_path="water_segmentation_result.jpg"
+    # )
     
     print("Water segmentation inference completed successfully!")
     print("Result images saved: water_segmentation_result.jpg")
