@@ -2,6 +2,7 @@
 sudo media-ctl -d /dev/media0 --set-v4l2 '4:0[fmt:SBGGR8_1X8/1920x1080@1/30 field:none colorspace:srgb xfer:srgb ycbcr:601 quantization:full-range]'
 sudo media-ctl -d /dev/media0 --set-v4l2 '"atmel_isc_scaler":0[fmt:SBGGR8_1X8/1920x1080 field:none colorspace:srgb]'
 sudo v4l2-ctl -v pixelformat=RGBP,height=1080,width=1920
+sleep 1
 
 while true; do
     # Read GPIO line 107 on gpiochip0

@@ -55,3 +55,8 @@ sudo systemctl status loop.service
 sudo systemctl stop loop.service
 sudo systemctl disable loop.service
 ```
+
+```bash
+sudo systemctl stop zerotier-one
+
+```
