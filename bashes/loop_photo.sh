@@ -5,11 +5,11 @@ sudo v4l2-ctl -v pixelformat=RGBP,height=1080,width=1920
 sleep 1
 
 while true; do
-    # Read GPIO line 107 on gpiochip0
+    # Read GPIO line 103 on gpiochip0
     value=$(sudo gpioget gpiochip0 103) # PD7
 
     if [ "$value" -eq 0 ]; then
-        echo "GPIO 107 is LOW → Taking photo..."
+        echo "GPIO 103 is LOW → Taking photo..."
 
         sleep 0.5
 
