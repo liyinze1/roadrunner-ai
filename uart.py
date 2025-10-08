@@ -41,7 +41,7 @@ class uart_connection:
         self.stop_recieve.set()
         self.receive_thread.join()
         self.uart.write(b'E')
-        sleep_mode = self.uart.read(1, timeout=1)
+        sleep_mode = self.uart.read(1)
         print('Sleep mode:', sleep_mode)
         if sleep_mode == b'S':
             # suspend to ram
