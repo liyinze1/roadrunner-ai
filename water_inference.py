@@ -3,6 +3,7 @@ from PIL import Image, ImageDraw, ImageFont
 import tflite_runtime.interpreter as tflite
 import gc  # For garbage collection
 import time
+import os
 class YOLOv11Segmentation:
     def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
                  max_image_size=1024):
@@ -334,7 +335,7 @@ class YOLOv11Segmentation:
 
 
 # Example usage
-def main(image_path = "water.jpg"):
+def main():
     # Initialize model
     
     t = time.time()
@@ -344,6 +345,13 @@ def main(image_path = "water.jpg"):
     
     # Run inference
     
+    image_path = "water.jpg"
+    if os.path.exists("./photos"):
+        image_files = sorted(os.listdir("./photos"))
+        if len(image_files) > 0:
+            image_path = os.path.join("./photos", image_files[-1])  # Use the latest image
+    
+    print(f"Using image: {image_path}")
     detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes

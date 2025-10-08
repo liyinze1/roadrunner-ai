@@ -21,7 +21,7 @@ while true; do
 
 
     echo "$(date '+%Y-%m-%d %H:%M:%S') - inference..." >> log.txt
-    sudo -u "acme" python3 loop.py $filename
+    sudo -u "acme" python3 loop.py
 
     code=$?   # capture exit code
 
