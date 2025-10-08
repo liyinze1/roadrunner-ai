@@ -1,9 +1,7 @@
 import threading
 from serial import Serial
-import gpiod
+# import gpiod
 import time
-
-
 
 
 class uart_connection:
@@ -16,22 +14,22 @@ class uart_connection:
         self.receive_thread.start()
         self.timeout = timeout
         
-        self.wake_gpio()
+        # self.wake_gpio()
         
-    def wake_gpio(self, gpio_pin=103):
-        chip = gpiod.Chip('gpiochip0')
-        line = chip.get_line(gpio_pin)
-        line.request(consumer='my-app', type=gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
+    # def wake_gpio(self, gpio_pin=103):
+    #     chip = gpiod.Chip('gpiochip0')
+    #     line = chip.get_line(gpio_pin)
+    #     line.request(consumer='my-app', type=gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
         
-        while True:
-            line.set_value(0)
-            time.sleep(0.1)
-            line.set_value(1)
-            if self.ack_received.wait(timeout=1):
-                self.ack_received.clear()
-                print('Wake up success')
-                break
-        line.release()
+    #     while True:
+    #         line.set_value(0)
+    #         time.sleep(0.1)
+    #         line.set_value(1)
+    #         if self.ack_received.wait(timeout=1):
+    #             self.ack_received.clear()
+    #             print('Wake up success')
+    #             break
+    #     line.release()
                 
     def send_depth(self, depth):
         return self._send(b'D' + int.to_bytes(2, 2, 'big') + int.to_bytes(depth, 2, 'big'))
@@ -42,12 +40,14 @@ class uart_connection:
     def reqest_sleep(self):
         self.stop_recieve.set()
         self.receive_thread.join()
-        self._send(b'S')
+        self.uart.write(b'E')
         sleep_mode = self.uart.read(1, timeout=1)
         print('Sleep mode:', sleep_mode)
-        if sleep_mode == b'R':
+        if sleep_mode == b'S':
+            # suspend to ram
             return 1
         else:
+            # power off
             return 0
         
     def _send(self, data):
