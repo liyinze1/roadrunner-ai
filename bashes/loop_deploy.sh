@@ -17,11 +17,11 @@ while true; do
 
     filename="/home/acme/roadrunner-ai/photos/$(date +%Y%m%d_%H%M%S).png"
     # sudo fswebcam -i 0 -p RGB565 -r 1280x720 -S 20 --no-banner "$filename"
-    sudo fswebcam -i 0 -p RGB565 -r 1920x1080 -S 20 --no-banner $filename
+    sudo fswebcam -i 0 -p RGB565 -r 1920x1080 -S 20 --no-banner "$filename"
 
 
     echo "$(date '+%Y-%m-%d %H:%M:%S') - inference..." >> log.txt
-    sudo -u "acme" python3 loop.py "$filename"
+    sudo -u "acme" python3 loop.py $filename
 
     code=$?   # capture exit code
 
