@@ -8,6 +8,8 @@ if len(arg) > 1:
 else:
     image_path = "water.jpg"
     
+    
+print("Image path:", image_path)    
 depth = water_inference.main(image_path)
 
 uart_conn = uart.uart_connection()
