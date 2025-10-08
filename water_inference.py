@@ -364,7 +364,7 @@ def main():
     print("Result images saved: water_segmentation_result.jpg")
     print(f"Total time: {time.time() - t:.2f} seconds")
     
-    return 0
+    return 50
 
 if __name__ == "__main__":
     main()
