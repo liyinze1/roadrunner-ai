@@ -9,7 +9,7 @@ sudo media-ctl -d /dev/media0 --set-v4l2 '4:0[fmt:SBGGR8_1X8/1280x720@1/30 field
 sudo media-ctl -d /dev/media0 --set-v4l2 '"atmel_isc_scaler":0[fmt:SBGGR8_1X8/1280x720 field:none colorspace:srgb]'
 sudo v4l2-ctl -v pixelformat=RGBP,height=720,width=1280
 sudo fswebcam -i 0 -p RGB565 -r 1280x720 -S 20 1280x720_SBGGR8.png
-sudo fswebcam -r 1280x720 -p RGB565  --set brightness=-1023 --set contrast=512 -S 20 test1.jpg
+# sudo fswebcam -r 1280x720 -p RGB565  --set brightness=-1023 --set contrast=512 -S 20 test1.jpg
 
 # 1920x1080
 sudo media-ctl -d /dev/media0 --set-v4l2 '4:0[fmt:SRGGB8_1X8/1920x1080@1/30 field:none colorspace:srgb]'
