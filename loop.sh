@@ -1,1 +1,1 @@
-sudo bash bashes/loop_deploy.sh
+sudo bash bashes/loop_photo.sh
