@@ -1,1 +1,1 @@
-sudo bash bashes/loop_photo.sh
+sudo bash bashes/loop_upload.sh 720
