@@ -1,34 +1,18 @@
 ### Roadrunner Pinout
 
-#### 1. ADC
+#### 1. UART
 
-|Signal|Pin|Comment|
+|Signal| Pin | Pin on nRF |
 |-|-|-|
-| ADC0  | PD19  | Photovoltaic
-| ADC1  | PD20  | Super Cap Volatage
-| ADC2  | PD21  |
-| ADC3  | PD22  |
-| ADC4  | PD23  |
-| ADC5  | PD24  |
-| ADC6  | PD25  |
-| ADC7  | PD26  |
-| ADC8  | PD27  |
-| ADC9  | PD28  |
-| ADC10 | PD29  |
-| ADC11 | PD30  |
+| RX | PC12 | TX | 
+| TX | PC13 | RX |
+| wkup | wkup | A1/14 |
 
-#### 2. UART
-
-|Signal| Pin|
-|-|-|
-| RX | PC12 |
-| TX | PC13 |
-
-#### 3. Camera
+#### 2. Camera
 
 https://www.acmesystems.it/roadrunner_isc
 
-#### 4. GPIO
+#### 3. GPIO
 
 Give permission
 
