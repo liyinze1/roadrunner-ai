@@ -58,5 +58,8 @@ sudo systemctl disable loop.service
 
 ```bash
 sudo systemctl stop zerotier-one
+sudo systemctl disable zerotier-one
 
+sudo systemctl enable zerotier-one
+sudo systemctl start zerotier-one
 ```
