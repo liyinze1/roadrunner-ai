@@ -35,6 +35,7 @@ class uart_connection:
         return self._send(b'D' + int.to_bytes(2, 2, 'big') + int.to_bytes(depth, 2, 'big'))
     
     def send_photo(self, data):
+        print('Sending photo chunk of size', len(data))
         return self._send(b'P' + int.to_bytes(len(data), 2, 'big') + data)
     
     def reqest_sleep(self):
