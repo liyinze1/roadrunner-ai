@@ -276,13 +276,16 @@ class YOLOv11Segmentation:
         # Preprocess image
         t = time.time()
         preprocessed_image = self.preprocess_image(image_path)
-        print(f"Preprocessing image time: {time.time() - t:.2f} seconds")
+        t1 = time.time()
+        print(f"Preprocessing image time: {t1 - t:.2f} seconds")
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
-        print(f"Set input tensor time: {time.time() - t:.2f} seconds")
+        t2 = time.time()
+        print(f"Set input tensor time: {t2 - t1:.2f} seconds")
         # Run inference
         self.interpreter.invoke()
-        print(f"Inference time: {time.time() - t:.2f} seconds")
+        t3 = time.time()
+        print(f"Inference invoke time: {t3 - t2:.2f} seconds")
         # Get outputs
         outputs = []
         for output_detail in self.output_details:
@@ -299,7 +302,8 @@ class YOLOv11Segmentation:
         # Apply NMS
         filtered_detections = self.apply_nms(detections)
         
-        print(f"Post-processing time: {time.time() - t:.2f} seconds")
+        t4 = time.time()
+        print(f"Post-processing time: {t4 - t3:.2f} seconds")
         
         return filtered_detections
     
