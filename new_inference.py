@@ -236,10 +236,38 @@ class YOLOv11Segmentation:
         Memory-optimized mask generation
         """
         try:
+            # Transpose mask_protos if needed to match coefficients
+            # Expected: mask_protos should be (C, H*W) where C matches len(mask_coeffs)
+            if len(mask_protos.shape) == 2:
+                # Shape is (H*W, C) or (C, H*W), need to check which
+                if mask_protos.shape[1] == len(mask_coeffs):
+                    # Shape is (H*W, C), transpose it to (C, H*W)
+                    mask_protos = mask_protos.T
+                elif mask_protos.shape[0] != len(mask_coeffs):
+                    print(f"Warning: mask_protos shape {mask_protos.shape} doesn't match coeffs length {len(mask_coeffs)}")
             
             # Compute mask with reduced precision for memory efficiency
-            mask_160 = np.dot(mask_protos, mask_coeffs.astype(np.float32))
+            # mask_coeffs: (C,), mask_protos: (C, H*W) -> result: (H*W,)
+            mask_160 = np.dot(mask_coeffs.astype(np.float32), mask_protos)
             mask_160 = 1 / (1 + np.exp(-mask_160))
+            
+            # Reshape back to 2D - try to infer dimensions
+            # Common mask sizes: 160x160, 80x80, etc.
+            mask_size = int(np.sqrt(mask_160.shape[0]))
+            if mask_size * mask_size == mask_160.shape[0]:
+                mask_160 = mask_160.reshape(mask_size, mask_size)
+            else:
+                # If not square, use known dimensions or default to 160x160
+                print(f"Warning: mask size {mask_160.shape[0]} is not square, using 160x160")
+                # Pad or crop to fit 160x160
+                target_size = 160 * 160
+                if mask_160.shape[0] < target_size:
+                    mask_160 = np.pad(mask_160, (0, target_size - mask_160.shape[0]), mode='constant')
+                else:
+                    mask_160 = mask_160[:target_size]
+                mask_160 = mask_160.reshape(160, 160)
+            
+            print(f"Generated mask shape: {mask_160.shape}")
             
             # Work with smaller intermediate arrays
             x1_model, y1_model, x2_model, y2_model = bbox_model_space
