@@ -60,7 +60,7 @@ class YOLOv11Segmentation:
         gc.collect()
         
         # Normalize
-        if self.dtype == np.float32:
+        if self.input_dtype == np.float32:
             image_array = image_array / 255.0
         image_array = np.expand_dims(image_array, axis=0)
         
