@@ -356,8 +356,8 @@ def main():
     
     t = time.time()
     
-    # model_path = "models/water_int8.tflite"
-    model_path = "models/water_float32.tflite"
+    model_path = "models/water_int8.tflite"
+    # model_path = "models/water_float32.tflite"
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
@@ -372,10 +372,10 @@ def main():
     detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
-    # yolo.visualize_masks(
-    #     detections,
-    #     save_path="water_segmentation_result.jpg"
-    # )
+    yolo.visualize_masks(
+        detections,
+        save_path="water_segmentation_result.jpg"
+    )
     
     print("Water segmentation inference completed successfully!")
     print("Result images saved: water_segmentation_result.jpg")
