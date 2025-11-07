@@ -38,7 +38,7 @@ class YOLOv11Segmentation:
         print(self.input_details)
         print(self.output_details)
         
-    def preprocess_image(self, image_path):
+    def preprocess_image(self, image_path, dtype=np.float32):
         """
         Memory-optimized image preprocessing
         """
@@ -53,13 +53,14 @@ class YOLOv11Segmentation:
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
         
         # Convert to numpy array with memory efficiency
-        image_array = np.array(resized_image, dtype=np.float32)
+        image_array = np.array(resized_image, dtype=dtype)
         del resized_image  # Free memory immediately
         del original_image
         gc.collect()
         
         # Normalize
-        image_array = image_array / 255.0
+        if dtype == np.float32:
+            image_array = image_array / 255.0
         image_array = np.expand_dims(image_array, axis=0)
         
         # Calculate scale factors
@@ -272,7 +273,7 @@ class YOLOv11Segmentation:
             original_image: Original input image
         """
         # Preprocess image
-        preprocessed_image = self.preprocess_image(image_path)
+        preprocessed_image = self.preprocess_image(image_path, dtype=self.input_details[0]['dtype'])
         
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
