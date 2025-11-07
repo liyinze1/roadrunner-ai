@@ -4,12 +4,11 @@ import tflite_runtime.interpreter as tflite
 import gc  # For garbage collection
 import time
 import os
-
 class YOLOv11Segmentation:
     def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
                  max_image_size=1024):
         """
-        Initialize YOLOv11 segmentation model (supports both FLOAT32 and INT8)
+        Initialize YOLOv11 segmentation model
         
         Args:
             model_path: Path to the .tflite model file
@@ -33,47 +32,15 @@ class YOLOv11Segmentation:
         self.input_height = self.input_shape[1]
         self.input_width = self.input_shape[2]
         
-        # Check if model is quantized
-        self.input_dtype = self.input_details[0]['dtype']
-        self.is_input_quantized = self.input_dtype in [np.uint8, np.int8]
         
-        if self.is_input_quantized:
-            self.input_scale, self.input_zero_point = self.input_details[0]['quantization']
-            print(f"✓ Quantized INPUT detected")
-            print(f"  - Input dtype: {self.input_dtype}")
-            print(f"  - Input scale: {self.input_scale}")
-            print(f"  - Input zero point: {self.input_zero_point}")
-        else:
-            print(f"✓ Float INPUT detected (dtype: {self.input_dtype})")
-        
-        # Check output quantization
-        self.output_quantization_info = []
-        for i, output_detail in enumerate(self.output_details):
-            output_dtype = output_detail['dtype']
-            is_quantized = output_dtype in [np.uint8, np.int8]
-            
-            if is_quantized:
-                scale, zero_point = output_detail['quantization']
-                self.output_quantization_info.append({
-                    'is_quantized': True,
-                    'dtype': output_dtype,
-                    'scale': scale,
-                    'zero_point': zero_point
-                })
-                print(f"✓ Quantized OUTPUT {i} detected (dtype: {output_dtype}, scale: {scale}, zero_point: {zero_point})")
-            else:
-                self.output_quantization_info.append({
-                    'is_quantized': False,
-                    'dtype': output_dtype
-                })
-                print(f"✓ Float OUTPUT {i} detected (dtype: {output_dtype})")
-        
-        print(f"\nModel loaded successfully")
+        print(f"Model loaded successfully)")
         print(f"Input shape: {self.input_shape}")
+        print(self.input_details)
+        print(self.output_details)
         
     def preprocess_image(self, image_path):
         """
-        Memory-optimized image preprocessing (handles both FLOAT32 and INT8 models)
+        Memory-optimized image preprocessing
         """
         # Load and potentially resize image for memory efficiency
         if isinstance(image_path, str):
@@ -81,93 +48,44 @@ class YOLOv11Segmentation:
         else:
             original_image = image_path.convert('RGB')
             
+
         # Resize to model input size
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
         
-        # Convert to numpy array
+        # Convert to numpy array with memory efficiency
         image_array = np.array(resized_image, dtype=np.float32)
-        del resized_image
+        del resized_image  # Free memory immediately
         del original_image
         gc.collect()
         
-        # Normalize to [0, 1]
+        # Normalize
         image_array = image_array / 255.0
         image_array = np.expand_dims(image_array, axis=0)
         
-        # Apply quantization if model expects quantized input
-        if self.is_input_quantized:
-            # Quantize: float32 -> uint8/int8
-            image_array = image_array / self.input_scale + self.input_zero_point
-            image_array = np.clip(image_array, 0, 255).astype(self.input_dtype)
-            print(f"Input quantized to {self.input_dtype}")
+        # Calculate scale factors
         
         return image_array
     
     def postprocess_detections(self, outputs):
         """
-        Memory-optimized post-processing of YOLOv11 outputs (handles quantized outputs)
+        Memory-optimized post-processing of YOLOv11 outputs
         """
         detections = []
 
         # Extract outputs with memory management
-        detection_output = outputs[0][0]  # Could be (37, 8400) or (160, 160, 32)
+        detection_output = outputs[0][0]  # (37, 8400)
+        mask_protos = outputs[1][0]  # Always extract mask prototypes for segmentation
         
-        print(f"Raw detection output shape: {detection_output.shape}")
-        print(f"Detection output dtype: {detection_output.dtype}, range: [{detection_output.min():.3f}, {detection_output.max():.3f}]")
+        # Transpose detection output
+        if detection_output.shape[0] < detection_output.shape[1]:
+            print("Transposing detection output from (37, 8400) to (8400, 37)")
+            detection_output = detection_output.T
         
-        # Handle different output formats
-        if len(detection_output.shape) == 3:
-            # Format: (H, W, C) - need to reshape to (N, C)
-            print(f"Detected 3D output format (H, W, C): {detection_output.shape}")
-            H, W, C = detection_output.shape
-            # Reshape to (H*W, C)
-            detection_output = detection_output.reshape(-1, C)
-            print(f"Reshaped to: {detection_output.shape}")
-            
-            # Check if we have mask prototypes
-            if len(outputs) > 1:
-                mask_protos = outputs[1][0]
-                print(f"Mask prototypes shape: {mask_protos.shape}")
-            else:
-                mask_protos = None
-                print("No mask prototypes found")
-        else:
-            # Format: (37, 8400) or (8400, 37)
-            mask_protos = outputs[1][0] if len(outputs) > 1 else None
-            
-            # Transpose detection output if needed
-            if detection_output.shape[0] < detection_output.shape[1]:
-                print("Transposing detection output from (C, N) to (N, C)")
-                detection_output = detection_output.T
-            
-            print(f"After transpose - Detection output shape: {detection_output.shape}")
-        
-        # Now detection_output should be (N, C) where N is number of detections
-        num_detections, num_features = detection_output.shape
-        print(f"Processing {num_detections} detections with {num_features} features each")
-        
-        # Determine the feature layout based on number of features
-        if num_features == 32:
-            # Format: [x, y, w, h, conf, mask_coeffs...]
-            coord_indices = [0, 1, 2, 3]
-            conf_index = 4
-            mask_start_index = 5
-            num_mask_coeffs = 27  # 32 - 5 = 27
-        elif num_features >= 37:
-            # Format: [x, y, w, h, conf, mask_coeffs...]
-            coord_indices = [0, 1, 2, 3]
-            conf_index = 4
-            mask_start_index = 5
-            num_mask_coeffs = min(32, num_features - 5)
-        else:
-            print(f"Warning: Unexpected number of features: {num_features}")
-            coord_indices = [0, 1, 2, 3]
-            conf_index = 4
-            mask_start_index = 5
-            num_mask_coeffs = max(0, num_features - 5)
+        print(f"After transpose - Detection output shape: {detection_output.shape}")
         
         # Process detections in chunks to save memory
-        chunk_size = min(8400, num_detections)
+        chunk_size = 8400
+        num_detections = detection_output.shape[0]
         
         for chunk_start in range(0, num_detections, chunk_size):
             chunk_end = min(chunk_start + chunk_size, num_detections)
@@ -177,11 +95,8 @@ class YOLOv11Segmentation:
                 actual_i = chunk_start + i
                 
                 # Extract coordinates and confidence
-                x_center = detection[coord_indices[0]]
-                y_center = detection[coord_indices[1]]
-                width = detection[coord_indices[2]]
-                height = detection[coord_indices[3]]
-                confidence = float(detection[conf_index])
+                x_center, y_center, width, height = detection[0:4]
+                confidence = detection[4]
                 
                 if confidence < self.conf_threshold:
                     continue
@@ -208,9 +123,9 @@ class YOLOv11Segmentation:
                 if box_width > 10 and box_height > 10:
                     # Generate mask for all valid detections in low memory mode
                     mask = None
-                    if mask_protos is not None and confidence > 0.5 and num_mask_coeffs > 0:
+                    if mask_protos is not None and confidence > 0.5:  # Lower threshold for mask generation
                         try:
-                            mask_coeffs = detection[mask_start_index:mask_start_index + num_mask_coeffs]
+                            mask_coeffs = detection[5:37]
                             mask = self.generate_mask_optimized(mask_coeffs, mask_protos, 
                                                               (x_center_px - width_px/2, y_center_px - height_px/2,
                                                                x_center_px + width_px/2, y_center_px + height_px/2))
@@ -236,38 +151,10 @@ class YOLOv11Segmentation:
         Memory-optimized mask generation
         """
         try:
-            # Transpose mask_protos if needed to match coefficients
-            # Expected: mask_protos should be (C, H*W) where C matches len(mask_coeffs)
-            if len(mask_protos.shape) == 2:
-                # Shape is (H*W, C) or (C, H*W), need to check which
-                if mask_protos.shape[1] == len(mask_coeffs):
-                    # Shape is (H*W, C), transpose it to (C, H*W)
-                    mask_protos = mask_protos.T
-                elif mask_protos.shape[0] != len(mask_coeffs):
-                    print(f"Warning: mask_protos shape {mask_protos.shape} doesn't match coeffs length {len(mask_coeffs)}")
             
             # Compute mask with reduced precision for memory efficiency
-            # mask_coeffs: (C,), mask_protos: (C, H*W) -> result: (H*W,)
-            mask_160 = np.dot(mask_coeffs.astype(np.float32), mask_protos)
+            mask_160 = np.dot(mask_protos, mask_coeffs.astype(np.float32))
             mask_160 = 1 / (1 + np.exp(-mask_160))
-            
-            # Reshape back to 2D - try to infer dimensions
-            # Common mask sizes: 160x160, 80x80, etc.
-            mask_size = int(np.sqrt(mask_160.shape[0]))
-            if mask_size * mask_size == mask_160.shape[0]:
-                mask_160 = mask_160.reshape(mask_size, mask_size)
-            else:
-                # If not square, use known dimensions or default to 160x160
-                print(f"Warning: mask size {mask_160.shape[0]} is not square, using 160x160")
-                # Pad or crop to fit 160x160
-                target_size = 160 * 160
-                if mask_160.shape[0] < target_size:
-                    mask_160 = np.pad(mask_160, (0, target_size - mask_160.shape[0]), mode='constant')
-                else:
-                    mask_160 = mask_160[:target_size]
-                mask_160 = mask_160.reshape(160, 160)
-            
-            print(f"Generated mask shape: {mask_160.shape}")
             
             # Work with smaller intermediate arrays
             x1_model, y1_model, x2_model, y2_model = bbox_model_space
@@ -375,13 +262,14 @@ class YOLOv11Segmentation:
     
     def predict(self, image_path):
         """
-        Run inference on an image (handles both FLOAT32 and INT8 models)
+        Run inference on an image
         
         Args:
             image_path: Path to input image or PIL Image object
             
         Returns:
             detections: List of detection results
+            original_image: Original input image
         """
         # Preprocess image
         preprocessed_image = self.preprocess_image(image_path)
@@ -392,19 +280,10 @@ class YOLOv11Segmentation:
         # Run inference
         self.interpreter.invoke()
         
-        # Get outputs and dequantize if necessary
+        # Get outputs
         outputs = []
-        for i, output_detail in enumerate(self.output_details):
+        for output_detail in self.output_details:
             output_data = self.interpreter.get_tensor(output_detail['index'])
-            
-            # Dequantize output if it's quantized
-            quant_info = self.output_quantization_info[i]
-            if quant_info['is_quantized']:
-                scale = quant_info['scale']
-                zero_point = quant_info['zero_point']
-                output_data = (output_data.astype(np.float32) - zero_point) * scale
-                print(f"Dequantized output {i}: scale={scale}, zero_point={zero_point}")
-            
             outputs.append(output_data)
         
         # Post-process results
@@ -457,6 +336,7 @@ class YOLOv11Segmentation:
         return 0
 
 
+
 # Example usage
 def main():
     # Initialize model
@@ -474,7 +354,7 @@ def main():
         if len(image_files) > 0:
             image_path = os.path.join("./photos", image_files[-1])  # Use the latest image
     
-    print(f"\nUsing image: {image_path}")
+    print(f"Using image: {image_path}")
     detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
@@ -483,7 +363,7 @@ def main():
     #     save_path="water_segmentation_result.jpg"
     # )
     
-    print("\nWater segmentation inference completed successfully!")
+    print("Water segmentation inference completed successfully!")
     print("Result images saved: water_segmentation_result.jpg")
     print(f"Total time: {time.time() - t:.2f} seconds")
     
