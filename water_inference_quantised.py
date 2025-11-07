@@ -351,13 +351,15 @@ class YOLOv11Segmentation:
 
 
 # Example usage
-def main():
+def main(model_type="32"):
     # Initialize model
     
     t = time.time()
     
-    model_path = "models/water_int8.tflite"
-    # model_path = "models/water_float32.tflite"
+    if model_type == "8":
+        model_path = "models/water_int8.tflite"
+    else:
+        model_path = "models/water_float32.tflite"
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
@@ -384,4 +386,6 @@ def main():
     return 50
 
 if __name__ == "__main__":
-    main()
+    import sys
+    arg = sys.argv[1] if len(sys.argv) > 1 else "32"
+    main(arg)
