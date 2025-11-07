@@ -110,20 +110,64 @@ class YOLOv11Segmentation:
         detections = []
 
         # Extract outputs with memory management
-        detection_output = outputs[0][0]  # (37, 8400)
-        mask_protos = outputs[1][0]  # Always extract mask prototypes for segmentation
+        detection_output = outputs[0][0]  # Could be (37, 8400) or (160, 160, 32)
         
-        # Transpose detection output
-        if detection_output.shape[0] < detection_output.shape[1]:
-            print("Transposing detection output from (37, 8400) to (8400, 37)")
-            detection_output = detection_output.T
-        
-        print(f"After transpose - Detection output shape: {detection_output.shape}")
+        print(f"Raw detection output shape: {detection_output.shape}")
         print(f"Detection output dtype: {detection_output.dtype}, range: [{detection_output.min():.3f}, {detection_output.max():.3f}]")
         
+        # Handle different output formats
+        if len(detection_output.shape) == 3:
+            # Format: (H, W, C) - need to reshape to (N, C)
+            print(f"Detected 3D output format (H, W, C): {detection_output.shape}")
+            H, W, C = detection_output.shape
+            # Reshape to (H*W, C)
+            detection_output = detection_output.reshape(-1, C)
+            print(f"Reshaped to: {detection_output.shape}")
+            
+            # Check if we have mask prototypes
+            if len(outputs) > 1:
+                mask_protos = outputs[1][0]
+                print(f"Mask prototypes shape: {mask_protos.shape}")
+            else:
+                mask_protos = None
+                print("No mask prototypes found")
+        else:
+            # Format: (37, 8400) or (8400, 37)
+            mask_protos = outputs[1][0] if len(outputs) > 1 else None
+            
+            # Transpose detection output if needed
+            if detection_output.shape[0] < detection_output.shape[1]:
+                print("Transposing detection output from (C, N) to (N, C)")
+                detection_output = detection_output.T
+            
+            print(f"After transpose - Detection output shape: {detection_output.shape}")
+        
+        # Now detection_output should be (N, C) where N is number of detections
+        num_detections, num_features = detection_output.shape
+        print(f"Processing {num_detections} detections with {num_features} features each")
+        
+        # Determine the feature layout based on number of features
+        if num_features == 32:
+            # Format: [x, y, w, h, conf, mask_coeffs...]
+            coord_indices = [0, 1, 2, 3]
+            conf_index = 4
+            mask_start_index = 5
+            num_mask_coeffs = 27  # 32 - 5 = 27
+        elif num_features >= 37:
+            # Format: [x, y, w, h, conf, mask_coeffs...]
+            coord_indices = [0, 1, 2, 3]
+            conf_index = 4
+            mask_start_index = 5
+            num_mask_coeffs = min(32, num_features - 5)
+        else:
+            print(f"Warning: Unexpected number of features: {num_features}")
+            coord_indices = [0, 1, 2, 3]
+            conf_index = 4
+            mask_start_index = 5
+            num_mask_coeffs = max(0, num_features - 5)
+        
         # Process detections in chunks to save memory
-        chunk_size = 8400
-        num_detections = detection_output.shape[0]
+        chunk_size = min(8400, num_detections)
         
         for chunk_start in range(0, num_detections, chunk_size):
             chunk_end = min(chunk_start + chunk_size, num_detections)
@@ -133,8 +177,11 @@ class YOLOv11Segmentation:
                 actual_i = chunk_start + i
                 
                 # Extract coordinates and confidence
-                x_center, y_center, width, height = detection[0:4]
-                confidence = detection[4]
+                x_center = detection[coord_indices[0]]
+                y_center = detection[coord_indices[1]]
+                width = detection[coord_indices[2]]
+                height = detection[coord_indices[3]]
+                confidence = float(detection[conf_index])
                 
                 if confidence < self.conf_threshold:
                     continue
@@ -161,9 +208,9 @@ class YOLOv11Segmentation:
                 if box_width > 10 and box_height > 10:
                     # Generate mask for all valid detections in low memory mode
                     mask = None
-                    if mask_protos is not None and confidence > 0.5:  # Lower threshold for mask generation
+                    if mask_protos is not None and confidence > 0.5 and num_mask_coeffs > 0:
                         try:
-                            mask_coeffs = detection[5:37]
+                            mask_coeffs = detection[mask_start_index:mask_start_index + num_mask_coeffs]
                             mask = self.generate_mask_optimized(mask_coeffs, mask_protos, 
                                                               (x_center_px - width_px/2, y_center_px - height_px/2,
                                                                x_center_px + width_px/2, y_center_px + height_px/2))
