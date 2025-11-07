@@ -340,7 +340,7 @@ def main():
     
     t = time.time()
     
-    model_path = "models/water_float32.tflite"
+    model_path = "models/water_int8.tflite"
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
