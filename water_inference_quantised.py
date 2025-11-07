@@ -286,6 +286,7 @@ class YOLOv11Segmentation:
         for output_detail in self.output_details:
             output_data = self.interpreter.get_tensor(output_detail['index'])
             outputs.append(output_data)
+            print(f"Output shape: {output_data.shape}, dtype: {output_data.dtype}")
         
         # Post-process results
         detections = self.postprocess_detections(outputs)
