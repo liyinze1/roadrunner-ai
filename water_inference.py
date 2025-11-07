@@ -32,8 +32,11 @@ class YOLOv11Segmentation:
         self.input_height = self.input_shape[1]
         self.input_width = self.input_shape[2]
         
+        
         print(f"Model loaded successfully)")
         print(f"Input shape: {self.input_shape}")
+        print(self.input_details)
+        print(self.output_details)
         
     def preprocess_image(self, image_path):
         """
