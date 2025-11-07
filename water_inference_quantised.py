@@ -31,6 +31,7 @@ class YOLOv11Segmentation:
         self.input_shape = self.input_details[0]['shape']
         self.input_height = self.input_shape[1]
         self.input_width = self.input_shape[2]
+        self.input_dtype = self.input_details[0]['dtype']
         
         
         print(f"Model loaded successfully)")
@@ -38,7 +39,7 @@ class YOLOv11Segmentation:
         print(self.input_details)
         print(self.output_details)
         
-    def preprocess_image(self, image_path, dtype=np.float32):
+    def preprocess_image(self, image_path):
         """
         Memory-optimized image preprocessing
         """
@@ -53,13 +54,13 @@ class YOLOv11Segmentation:
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
         
         # Convert to numpy array with memory efficiency
-        image_array = np.array(resized_image, dtype=dtype)
+        image_array = np.array(resized_image, dtype=self.input_dtype)
         del resized_image  # Free memory immediately
         del original_image
         gc.collect()
         
         # Normalize
-        if dtype == np.float32:
+        if self.dtype == np.float32:
             image_array = image_array / 255.0
         image_array = np.expand_dims(image_array, axis=0)
         
@@ -273,7 +274,7 @@ class YOLOv11Segmentation:
             original_image: Original input image
         """
         # Preprocess image
-        preprocessed_image = self.preprocess_image(image_path, dtype=self.input_details[0]['dtype'])
+        preprocessed_image = self.preprocess_image(image_path)
         
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
@@ -286,7 +287,10 @@ class YOLOv11Segmentation:
         for output_detail in self.output_details:
             output_data = self.interpreter.get_tensor(output_detail['index'])
             outputs.append(output_data)
-            print(f"Output shape: {output_data.shape}, dtype: {output_data.dtype}")
+            # print(f"Output shape: {output_data.shape}, dtype: {output_data.dtype}")
+        
+        if self.input_dtype == np.uint8:
+            outputs = outputs[::-1]  # Reverse outputs for quantized models if needed
         
         # Post-process results
         detections = self.postprocess_detections(outputs)
