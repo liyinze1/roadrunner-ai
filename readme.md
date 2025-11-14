@@ -41,4 +41,7 @@ sudo systemctl disable zerotier-one
 
 sudo systemctl enable zerotier-one
 sudo systemctl start zerotier-one
+
+sudo systemctl disable wpa_supplicant.service
+sudo systemctl disable networking.service
 ```
