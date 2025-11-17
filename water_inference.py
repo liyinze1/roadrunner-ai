@@ -6,7 +6,7 @@ import time
 import os
 class YOLOv11Segmentation:
     def __init__(self, model_path, conf_threshold=0.5, iou_threshold=0.7, 
-                 max_image_size=1024):
+                max_image_size=1024):
         """
         Initialize YOLOv11 segmentation model
         
@@ -21,6 +21,7 @@ class YOLOv11Segmentation:
         
         # Load TFLite model
         self.interpreter = tflite.Interpreter(model_path=model_path, num_threads=1, experimental_delegates=None)
+        self.interpreter.allocate_tensors()
         
         # Get input and output tensors info
         self.input_details = self.interpreter.get_input_details()
@@ -32,13 +33,41 @@ class YOLOv11Segmentation:
         self.input_width = self.input_shape[2]
         self.input_dtype = self.input_details[0]['dtype']
         
+        # Get quantization parameters for input
+        self.input_scale = self.input_details[0]['quantization'][0]
+        self.input_zero_point = self.input_details[0]['quantization'][1]
         
-        print(f"Model loaded successfully)")
+        print(f"Model loaded successfully")
         print(f"Input shape: {self.input_shape}")
-        print(self.input_details)
-        print(self.output_details)
+        print(f"Input dtype: {self.input_dtype}")
+        print(f"Input quantization: scale={self.input_scale}, zero_point={self.input_zero_point}")
         
-        self.interpreter.allocate_tensors()
+        # Print output details with quantization info
+        for i, output_detail in enumerate(self.output_details):
+            scale = output_detail['quantization'][0]
+            zero_point = output_detail['quantization'][1]
+            print(f"Output {i}: shape={output_detail['shape']}, dtype={output_detail['dtype']}, "
+                f"scale={scale}, zero_point={zero_point}")
+        
+    def dequantize_tensor(self, quantized_data, scale, zero_point):
+        """
+        Dequantize uint8/int8 tensor to float32
+        
+        Args:
+            quantized_data: Quantized tensor (uint8 or int8)
+            scale: Quantization scale
+            zero_point: Quantization zero point
+            
+        Returns:
+            Dequantized float32 tensor
+        """
+        if scale == 0.0:
+            # Already in float format, no quantization
+            return quantized_data.astype(np.float32)
+        
+        # Dequantize: real_value = scale * (quantized_value - zero_point)
+        dequantized = scale * (quantized_data.astype(np.float32) - zero_point)
+        return dequantized
         
     def preprocess_image(self, image_path):
         """
@@ -75,9 +104,12 @@ class YOLOv11Segmentation:
         """
         detections = []
 
-        # Extract outputs with memory management
-        detection_output = outputs[0][0]  # (37, 8400)
-        mask_protos = outputs[1][0]  # Always extract mask prototypes for segmentation
+        if outputs[0][0].shape == (37, 8400):
+            detection_output = outputs[0][0]  # (37, 8400)
+            mask_protos = outputs[1][0]  # Always extract mask prototypes for segmentation
+        else:
+            detection_output = outputs[1][0]  # (37, 8400)
+            mask_protos = outputs[0][0]  # Always extract mask prototypes for segmentation
         
         # Transpose detection output
         if detection_output.shape[0] < detection_output.shape[1]:
@@ -294,8 +326,62 @@ class YOLOv11Segmentation:
             outputs.append(output_data)
             # print(f"Output shape: {output_data.shape}, dtype: {output_data.dtype}")
         
-        if self.input_dtype == np.uint8:
-            outputs = outputs[::-1]  # Reverse outputs for quantized models if needed
+        
+        # Post-process results
+        detections = self.postprocess_detections(outputs)
+        
+        # Apply NMS
+        filtered_detections = self.apply_nms(detections)
+        
+        t4 = time.time()
+        print(f"Post-processing time: {t4 - t3:.2f} seconds")
+        
+        return filtered_detections
+    
+    def predict_quantised(self, image_path):
+        """
+        Run inference on an image
+        
+        Args:
+            image_path: Path to input image or PIL Image object
+            
+        Returns:
+            detections: List of detection results
+        """
+        # Preprocess image
+        t = time.time()
+        preprocessed_image = self.preprocess_image(image_path)
+        t1 = time.time()
+        print(f"Preprocessing image time: {t1 - t:.2f} seconds")
+        
+        # Set input tensor
+        self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
+        t2 = time.time()
+        print(f"Set input tensor time: {t2 - t1:.2f} seconds")
+        
+        # Run inference
+        self.interpreter.invoke()
+        t3 = time.time()
+        print(f"Inference invoke time: {t3 - t2:.2f} seconds")
+        
+        # Get outputs and DEQUANTIZE if needed
+        outputs = []
+        for i, output_detail in enumerate(self.output_details):
+            output_data = self.interpreter.get_tensor(output_detail['index'])
+            
+            # Get quantization parameters
+            scale = output_detail['quantization'][0]
+            zero_point = output_detail['quantization'][1]
+            
+            # Check if output needs dequantization
+            if output_detail['dtype'] in [np.uint8, np.int8]:
+                print(f"Dequantizing output {i}: dtype={output_detail['dtype']}, scale={scale:.6f}, zero_point={zero_point}")
+                output_data = self.dequantize_tensor(output_data, scale, zero_point)
+                print(f"  Value range after dequantization: [{output_data.min():.4f}, {output_data.max():.4f}]")
+            else:
+                print(f"Output {i} is {output_detail['dtype']}, no dequantization needed")
+            
+            outputs.append(output_data)
         
         # Post-process results
         detections = self.postprocess_detections(outputs)
@@ -404,23 +490,31 @@ def main(model_type="8"):
     t = time.time()
     
     if model_type == "8":
-        model_path = "models/best_int8.tflite"
+        model_path = "models/best_full_integer_quant.tflite"
+    elif model_type == "hybrid":
+        model_path = "models/best_integer_quant.tflite"
     else:
         model_path = "models/best_float32.tflite"
+        
+    print(f"Loading model from: {model_path}")
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
     
-    image_path = "water_720.png"
+    image_path = "water_1080.png"
     if os.path.exists("./photos"):
         image_files = sorted(os.listdir("./photos"))
         if len(image_files) > 0:
             image_path = os.path.join("./photos", image_files[-1])  # Use the latest image
     
-    # image_path = 'water_720.png'
+    image_path = 'water_720.png'
     
     print(f"Using image: {image_path}")
-    detections = yolo.predict(image_path)
+    
+    if model_type == "8":
+        detections = yolo.predict_quantised(image_path)
+    else:
+        detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
     # yolo.visualize_masks(
