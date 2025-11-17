@@ -410,7 +410,7 @@ def main(model_type="8"):
     
     # Run inference
     
-    image_path = "water.png"
+    image_path = "water_720.png"
     if os.path.exists("./photos"):
         image_files = sorted(os.listdir("./photos"))
         if len(image_files) > 0:
