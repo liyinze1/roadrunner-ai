@@ -1,6 +1,6 @@
 ### This is the repo for the software running on RoadRunner. 
 
-Relevant repos:
+Relevant repos for paper BEAVER:
 
 1. Software running on nRF9160: https://github.com/liyinze1/edge-ai-modem
 2. Yolov11 training & quantisation pipeline: https://github.com/liyinze1/water-level
