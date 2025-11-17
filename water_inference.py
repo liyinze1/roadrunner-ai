@@ -403,9 +403,9 @@ def main(model_type="8"):
     t = time.time()
     
     if model_type == "8":
-        model_path = "models/water_int8.tflite"
+        model_path = "models/best_int8.tflite"
     else:
-        model_path = "models/water_float32.tflite"
+        model_path = "models/best_float32.tflite"
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
