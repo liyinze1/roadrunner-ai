@@ -31,6 +31,7 @@ class YOLOv11Segmentation:
         self.input_shape = self.input_details[0]['shape']
         self.input_height = self.input_shape[1]
         self.input_width = self.input_shape[2]
+        self.input_dtype = self.input_details[0]['dtype']
         
         
         print(f"Model loaded successfully)")
@@ -53,13 +54,14 @@ class YOLOv11Segmentation:
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
         
         # Convert to numpy array with memory efficiency
-        image_array = np.array(resized_image, dtype=np.float32)
+        image_array = np.array(resized_image, dtype=self.input_dtype)
         del resized_image  # Free memory immediately
         del original_image
         gc.collect()
         
         # Normalize
-        image_array = image_array / 255.0
+        if self.input_dtype == np.float32:
+            image_array = image_array / 255.0
         image_array = np.expand_dims(image_array, axis=0)
         
         # Calculate scale factors
@@ -272,25 +274,36 @@ class YOLOv11Segmentation:
             original_image: Original input image
         """
         # Preprocess image
+        t = time.time()
         preprocessed_image = self.preprocess_image(image_path)
-        
+        t1 = time.time()
+        print(f"Preprocessing image time: {t1 - t:.2f} seconds")
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
-        
+        t2 = time.time()
+        print(f"Set input tensor time: {t2 - t1:.2f} seconds")
         # Run inference
         self.interpreter.invoke()
-        
+        t3 = time.time()
+        print(f"Inference invoke time: {t3 - t2:.2f} seconds")
         # Get outputs
         outputs = []
         for output_detail in self.output_details:
             output_data = self.interpreter.get_tensor(output_detail['index'])
             outputs.append(output_data)
             # print(f"Output shape: {output_data.shape}, dtype: {output_data.dtype}")
+        
+        if self.input_dtype == np.uint8:
+            outputs = outputs[::-1]  # Reverse outputs for quantized models if needed
+        
         # Post-process results
         detections = self.postprocess_detections(outputs)
         
         # Apply NMS
         filtered_detections = self.apply_nms(detections)
+        
+        t4 = time.time()
+        print(f"Post-processing time: {t4 - t3:.2f} seconds")
         
         return filtered_detections
     
@@ -334,16 +347,65 @@ class YOLOv11Segmentation:
         if save_path:
             result_image.save(save_path)
         return 0
-
-
+    
+    def calculate_mask_coverage(self, detections, image_height=640, image_width=640):
+        """
+        Calculate what percentage of the image is covered by segmentation masks
+        
+        Args:
+            detections: List of detection dictionaries containing masks
+            image_height: Height of the image
+            image_width: Width of the image
+            
+        Returns:
+            coverage_percentage: Integer percentage of image covered by masks (0-100)
+        """
+        if len(detections) == 0:
+            return 0
+        
+        # Create binary mask overlay
+        mask_overlay = np.zeros((image_height, image_width), dtype=np.uint8)
+        
+        for det in detections:
+            x1, y1, x2, y2 = det['bbox']
+            mask = det['mask']
+            
+            if mask is not None and mask.size > 0:
+                mask_h, mask_w = mask.shape
+                end_y = min(y1 + mask_h, image_height)
+                end_x = min(x1 + mask_w, image_width)
+                actual_h = end_y - y1
+                actual_w = end_x - x1
+                
+                if actual_h > 0 and actual_w > 0:
+                    # Resize mask if needed
+                    if mask_h != actual_h or mask_w != actual_w:
+                        mask_pil = Image.fromarray((mask * 255).astype(np.uint8))
+                        mask_resized = mask_pil.resize((actual_w, actual_h), Image.LANCZOS)
+                        mask = (np.array(mask_resized) > 127).astype(np.uint8)
+                    
+                    # Apply mask to overlay (binary: 0 or 1)
+                    mask_overlay[y1:end_y, x1:end_x] = np.where(
+                        mask > 0, 1, mask_overlay[y1:end_y, x1:end_x]
+                    )
+        
+        # Calculate coverage
+        total_pixels = image_height * image_width
+        masked_pixels = np.sum(mask_overlay)
+        coverage_percentage = int((masked_pixels / total_pixels) * 100)
+        
+        return coverage_percentage
 
 # Example usage
-def main():
+def main(model_type="8"):
     # Initialize model
     
     t = time.time()
     
-    model_path = "models/water_float32.tflite"
+    if model_type == "8":
+        model_path = "models/water_int8.tflite"
+    else:
+        model_path = "models/water_float32.tflite"
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
@@ -354,6 +416,8 @@ def main():
         if len(image_files) > 0:
             image_path = os.path.join("./photos", image_files[-1])  # Use the latest image
     
+    # image_path = 'water_720.png'
+    
     print(f"Using image: {image_path}")
     detections = yolo.predict(image_path)
     
@@ -362,12 +426,16 @@ def main():
     #     detections,
     #     save_path="water_segmentation_result.jpg"
     # )
+
+    percent = yolo.calculate_mask_coverage(detections)
     
     print("Water segmentation inference completed successfully!")
-    print("Result images saved: water_segmentation_result.jpg")
+    print("Water coverage percentage:", percent)
     print(f"Total time: {time.time() - t:.2f} seconds")
     
-    return 50
+    return int(percent)
 
 if __name__ == "__main__":
-    main()
+    import sys
+    arg = sys.argv[1] if len(sys.argv) > 1 else "8"
+    main(arg)

@@ -31,7 +31,6 @@ class YOLOv11Segmentation:
         self.input_shape = self.input_details[0]['shape']
         self.input_height = self.input_shape[1]
         self.input_width = self.input_shape[2]
-        self.input_dtype = self.input_details[0]['dtype']
         
         
         print(f"Model loaded successfully)")
@@ -54,14 +53,13 @@ class YOLOv11Segmentation:
         resized_image = original_image.resize((self.input_width, self.input_height), Image.LANCZOS)
         
         # Convert to numpy array with memory efficiency
-        image_array = np.array(resized_image, dtype=self.input_dtype)
+        image_array = np.array(resized_image, dtype=np.float32)
         del resized_image  # Free memory immediately
         del original_image
         gc.collect()
         
         # Normalize
-        if self.input_dtype == np.float32:
-            image_array = image_array / 255.0
+        image_array = image_array / 255.0
         image_array = np.expand_dims(image_array, axis=0)
         
         # Calculate scale factors
@@ -274,36 +272,25 @@ class YOLOv11Segmentation:
             original_image: Original input image
         """
         # Preprocess image
-        t = time.time()
         preprocessed_image = self.preprocess_image(image_path)
-        t1 = time.time()
-        print(f"Preprocessing image time: {t1 - t:.2f} seconds")
+        
         # Set input tensor
         self.interpreter.set_tensor(self.input_details[0]['index'], preprocessed_image)
-        t2 = time.time()
-        print(f"Set input tensor time: {t2 - t1:.2f} seconds")
+        
         # Run inference
         self.interpreter.invoke()
-        t3 = time.time()
-        print(f"Inference invoke time: {t3 - t2:.2f} seconds")
+        
         # Get outputs
         outputs = []
         for output_detail in self.output_details:
             output_data = self.interpreter.get_tensor(output_detail['index'])
             outputs.append(output_data)
             # print(f"Output shape: {output_data.shape}, dtype: {output_data.dtype}")
-        
-        if self.input_dtype == np.uint8:
-            outputs = outputs[::-1]  # Reverse outputs for quantized models if needed
-        
         # Post-process results
         detections = self.postprocess_detections(outputs)
         
         # Apply NMS
         filtered_detections = self.apply_nms(detections)
-        
-        t4 = time.time()
-        print(f"Post-processing time: {t4 - t3:.2f} seconds")
         
         return filtered_detections
     
@@ -351,15 +338,12 @@ class YOLOv11Segmentation:
 
 
 # Example usage
-def main(model_type="32"):
+def main():
     # Initialize model
     
     t = time.time()
     
-    if model_type == "8":
-        model_path = "models/water_int8.tflite"
-    else:
-        model_path = "models/water_float32.tflite"
+    model_path = "models/water_float32.tflite"
     yolo = YOLOv11Segmentation(model_path, conf_threshold=0.5)
     
     # Run inference
@@ -374,10 +358,10 @@ def main(model_type="32"):
     detections = yolo.predict(image_path)
     
     # Generate and visualize segmentation masks instead of bounding boxes
-    yolo.visualize_masks(
-        detections,
-        save_path="water_segmentation_result.jpg"
-    )
+    # yolo.visualize_masks(
+    #     detections,
+    #     save_path="water_segmentation_result.jpg"
+    # )
     
     print("Water segmentation inference completed successfully!")
     print("Result images saved: water_segmentation_result.jpg")
@@ -386,6 +370,4 @@ def main(model_type="32"):
     return 50
 
 if __name__ == "__main__":
-    import sys
-    arg = sys.argv[1] if len(sys.argv) > 1 else "32"
-    main(arg)
+    main()
