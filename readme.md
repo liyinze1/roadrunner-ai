@@ -1,4 +1,9 @@
-### Roadrunner Pinout
+This is the repo for the software running on RoadRunner. 
+
+Relevant repos:
+
+1. Software running on nRF9160: https://github.com/liyinze1/edge-ai-modem
+2. Yolov11 training & quantisation pipeline: https://github.com/liyinze1/water-level
 
 #### 1. UART
 
@@ -22,8 +27,7 @@ sudo chmod 666 /dev/gpiochip0
 sudo gpioinfo gpiochip0
 ```
 
-
-### Run the loop service
+#### 4. Service Shortcut
 
 ```bash
 sudo cp loop.service /etc/systemd/system/
@@ -35,6 +39,7 @@ sudo systemctl stop loop.service
 sudo systemctl disable loop.service
 ```
 
+To disable unused services:
 ```bash
 sudo systemctl stop zerotier-one
 sudo systemctl disable zerotier-one
