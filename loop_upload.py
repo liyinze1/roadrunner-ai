@@ -1,4 +1,3 @@
-import water_inference
 import uart
 import os
 
