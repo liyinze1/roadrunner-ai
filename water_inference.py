@@ -21,7 +21,6 @@ class YOLOv11Segmentation:
         
         # Load TFLite model
         self.interpreter = tflite.Interpreter(model_path=model_path, num_threads=1, experimental_delegates=None)
-        self.interpreter.allocate_tensors()
         
         # Get input and output tensors info
         self.input_details = self.interpreter.get_input_details()
@@ -38,6 +37,8 @@ class YOLOv11Segmentation:
         print(f"Input shape: {self.input_shape}")
         print(self.input_details)
         print(self.output_details)
+        
+        self.interpreter.allocate_tensors()
         
     def preprocess_image(self, image_path):
         """
