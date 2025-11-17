@@ -20,7 +20,7 @@ class YOLOv11Segmentation:
         self.max_image_size = max_image_size
         
         # Load TFLite model
-        self.interpreter = tflite.Interpreter(model_path=model_path, num_threads=1)
+        self.interpreter = tflite.Interpreter(model_path=model_path, num_threads=1, experimental_delegates=None)
         self.interpreter.allocate_tensors()
         
         # Get input and output tensors info
