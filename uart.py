@@ -5,7 +5,7 @@ import time
 
 
 class uart_connection:
-    def __init__(self, uart='/dev/ttyS1', baudrate=115200, timeout=1):
+    def __init__(self, uart='/dev/ttyS1', baudrate=230400, timeout=1):
         self.uart = Serial(uart, baudrate)
         
         self.stop_recieve = threading.Event()
