@@ -14,8 +14,6 @@ class u_net_model:
         self.output_scale, self.output_zero = self.output_details[0]['quantization']
         _, self.input_h, self.input_w, self.input_c = self.input_details[0]['shape']
 
-
-
     def load_image(self, image_path):
         img = Image.open(image_path)
 
@@ -43,17 +41,7 @@ class u_net_model:
     
     def infer(self, input_tensor):       
         # Set input tensor
-        self.interpreter.set_tensor(self.input_details[0]['index'], input_tensor)
-
-        # Run inference
-        self.interpreter.invoke()
-
-        # Retrieve output
-        output_q = self.interpreter.get_tensor(self.output_details[0]['index'])[0]  # shape: 256x256x1
-
-        # Dequantize: f = (q - zero_point) * scale
-        output_f = (output_q.astype(np.float32) - self.output_zero) * self.output_scale
-        output_f = np.squeeze(output_f)   # shape: 256x256
+  # shape: 256x256
         return output_f
     
     def save_mask(self, output_f, save_path, threshold=MASK_THRESHOLD):
@@ -68,10 +56,34 @@ class u_net_model:
         percentage = (water_pixels / total_pixels) * 100
         return percentage
     
-    def predict(self, image_path, threshold=MASK_THRESHOLD):
+    def predict(self, image_path):
+        
+        t = time.time()
         img_np = self.load_image(image_path)
         input_tensor = self.preprocess(img_np)
+        
+        t1 = time.time()
+        print(f"Preprocessing time: {t1 - t:.3f} seconds")
+        
+        self.interpreter.set_tensor(self.input_details[0]['index'], input_tensor)
+
+        t2 = time.time()
+        print(f"Set tensor time: {t2 - t1:.3f} seconds")
+        # Run inference
+        self.interpreter.invoke()
+
+        t3 = time.time()
+        print(f"Inference time: {t3 - t2:.3f} seconds")
+        # Retrieve output
+        output_q = self.interpreter.get_tensor(self.output_details[0]['index'])[0]  # shape: 256x256x1
+
+        # Dequantize: f = (q - zero_point) * scale
+        output_f = (output_q.astype(np.float32) - self.output_zero) * self.output_scale
+        output_f = np.squeeze(output_f) 
         output_f = self.infer(input_tensor)
+        
+        t4 = time.time()
+        print(f"Postprocessing time: {t4 - t3:.3f} seconds")
         return output_f
     
 def main():
