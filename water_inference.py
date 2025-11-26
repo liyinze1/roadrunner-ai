@@ -514,7 +514,7 @@ def main(model_type="8"):
     
     print(f"Using image: {image_path}")
     
-    if model_type == "8":
+    if model_type == "8" or model_type == "tiny":
         detections = yolo.predict_quantised(image_path)
     else:
         detections = yolo.predict(image_path)
