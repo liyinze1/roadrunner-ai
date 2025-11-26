@@ -488,7 +488,8 @@ def main(model_type="8"):
     # Initialize model
     
     t = time.time()
-    
+    if model_type == "tiny":
+        model_path = "models/tiny_unet_int8.tflite"
     if model_type == "8":
         model_path = "models/best_full_integer_quant.tflite"
     elif model_type == "hybrid":
@@ -501,7 +502,7 @@ def main(model_type="8"):
     
     # Run inference
     
-    image_path = "water_1080.png"
+    # image_path = "water_1080.png"
     if os.path.exists("./photos"):
         image_files = sorted(os.listdir("./photos"))
         if len(image_files) > 0:

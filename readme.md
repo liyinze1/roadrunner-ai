@@ -49,4 +49,6 @@ sudo systemctl start zerotier-one
 
 sudo systemctl disable wpa_supplicant.service
 sudo systemctl disable networking.service
+sudo systemctl disable ifup@eth0.service
+sudo systemctl mask ifup@eth0.service
 ```
