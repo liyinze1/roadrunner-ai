@@ -96,7 +96,7 @@ def main():
     percentage = model.calculate_percentage(output)
     
     print(f"Water coverage percentage: {percentage:.2f}%")
-    return percentage
+    return int(percentage)
     
 if __name__ == "__main__":
     main()
