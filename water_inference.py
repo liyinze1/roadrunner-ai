@@ -487,6 +487,8 @@ class YOLOv11Segmentation:
 def main(model_type="8"):
     # Initialize model
     
+    print('model type:', model_type)
+    
     t = time.time()
     if model_type == "tiny":
         model_path = "models/tiny_unet_int8.tflite"
