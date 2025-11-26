@@ -490,9 +490,7 @@ def main(model_type="8"):
     print('model type:', model_type)
     
     t = time.time()
-    if model_type == "tiny":
-        model_path = "models/tiny_unet_int8.tflite"
-    elif model_type == "8":
+    if model_type == "8":
         model_path = "models/best_full_integer_quant.tflite"
     elif model_type == "hybrid":
         model_path = "models/best_integer_quant.tflite"
@@ -514,7 +512,7 @@ def main(model_type="8"):
     
     print(f"Using image: {image_path}")
     
-    if model_type == "8" or model_type == "tiny":
+    if model_type == "8":
         detections = yolo.predict_quantised(image_path)
     else:
         detections = yolo.predict(image_path)
