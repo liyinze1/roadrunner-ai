@@ -492,7 +492,7 @@ def main(model_type="8"):
     t = time.time()
     if model_type == "tiny":
         model_path = "models/tiny_unet_int8.tflite"
-    if model_type == "8":
+    elif model_type == "8":
         model_path = "models/best_full_integer_quant.tflite"
     elif model_type == "hybrid":
         model_path = "models/best_integer_quant.tflite"
