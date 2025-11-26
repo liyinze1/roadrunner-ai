@@ -1,85 +1,90 @@
 import numpy as np
 from PIL import Image
 import tflite_runtime.interpreter as tflite
-# If using full TensorFlow:
-# from tensorflow.lite import Interpreter
+import time
 
-# ---------------------------------------------------------
-# User parameters
-# ---------------------------------------------------------
-MODEL_PATH = 'models/tiny_unet_int8.tflite'
-IMAGE_PATH = 'water_720.png'      # any size, any format
-MASK_THRESHOLD = 0.5          # segmentation threshold
-# ---------------------------------------------------------
+MASK_THRESHOLD = 0.5
+class u_net_model:
+    def __init__(self, model_path):
+        self.interpreter = tflite.Interpreter(model_path=model_path)
+        self.interpreter.allocate_tensors()
+        self.input_details = self.interpreter.get_input_details()
+        self.output_details = self.interpreter.get_output_details()
+        self.input_scale, self.input_zero = self.input_details[0]['quantization']
+        self.output_scale, self.output_zero = self.output_details[0]['quantization']
+        _, self.input_h, self.input_w, self.input_c = self.input_details[0]['shape']
 
-# Load TFLite model
-interpreter = tflite.Interpreter(model_path=MODEL_PATH)
-interpreter.allocate_tensors()
 
-# Get input/output details
-input_details = interpreter.get_input_details()
-print('input details', input_details)
-output_details = interpreter.get_output_details()
-print('output details', output_details)
 
-# Extract quantization info
-input_scale, input_zero = input_details[0]['quantization']
-output_scale, output_zero = output_details[0]['quantization']
+    def load_image(self, image_path):
+        img = Image.open(image_path)
 
-# Model expects NHWC = (1, 256, 256, 3)
-_, input_h, input_w, input_c = input_details[0]['shape']
+        # Ensure RGB format
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
 
-print('Model input:', input_h, input_w, input_c)
-print('Input quant:', input_scale, input_zero)
-print('Output quant:', output_scale, output_zero)
+        # Resize to model input size
+        img = img.resize((self.input_w, self.input_h), Image.BILINEAR)
 
-# ---------------------------------------------------------
-# Load + normalize + resize image automatically
-# ---------------------------------------------------------
-img = Image.open(IMAGE_PATH)
+        # Convert to numpy
+        img_np = np.array(img, dtype=np.float32)
+        return img_np
+    
+    def preprocess(self, img_np):
+        # Quantize image to int8
+        # q = f/scale + zero_point
+        img_q = img_np / 255.0               # normalize [0,1]
+        img_q = img_q / self.input_scale + self.input_zero
+        img_q = np.clip(img_q, -128, 127).astype(np.int8)
 
-# Ensure RGB format
-if img.mode != 'RGB':
-    img = img.convert('RGB')
+        # Add batch dimension
+        input_tensor = np.expand_dims(img_q, axis=0)
+        return input_tensor
+    
+    def infer(self, input_tensor):       
+        # Set input tensor
+        self.interpreter.set_tensor(self.input_details[0]['index'], input_tensor)
 
-# Resize to model input size
-img = img.resize((input_w, input_h), Image.BILINEAR)
+        # Run inference
+        self.interpreter.invoke()
 
-# Convert to numpy
-img_np = np.array(img, dtype=np.float32)
+        # Retrieve output
+        output_q = self.interpreter.get_tensor(self.output_details[0]['index'])[0]  # shape: 256x256x1
 
-# ---------------------------------------------------------
-# Quantize image to int8
-# q = f/scale + zero_point
-# ---------------------------------------------------------
-img_q = img_np / 255.0               # normalize [0,1]
-img_q = img_q / input_scale + input_zero
-img_q = np.clip(img_q, -128, 127).astype(np.int8)
+        # Dequantize: f = (q - zero_point) * scale
+        output_f = (output_q.astype(np.float32) - self.output_zero) * self.output_scale
+        output_f = np.squeeze(output_f)   # shape: 256x256
+        return output_f
+    
+    def save_mask(self, output_f, save_path, threshold=MASK_THRESHOLD):
+        mask = (output_f > threshold).astype(np.uint8) * 255
+        mask_img = Image.fromarray(mask)
+        mask_img.save(save_path)
+        
+    def calculate_percentage(self, output_f, threshold=MASK_THRESHOLD):
+        mask = (output_f > threshold).astype(np.uint8).flatten()
+        water_pixels = np.sum(mask)
+        total_pixels = len(mask)
+        percentage = (water_pixels / total_pixels) * 100
+        return percentage
+    
+    def predict(self, image_path, threshold=MASK_THRESHOLD):
+        img_np = self.load_image(image_path)
+        input_tensor = self.preprocess(img_np)
+        output_f = self.infer(input_tensor)
+        return output_f
+    
+def main():
+    model_path = "models/tiny_unet_int8.tflite"
+    image_path = "water_720.png"
 
-# Add batch dimension
-input_tensor = np.expand_dims(img_q, axis=0)
-
-# Set input tensor
-interpreter.set_tensor(input_details[0]['index'], input_tensor)
-
-# Run inference
-interpreter.invoke()
-
-# ---------------------------------------------------------
-# Retrieve output
-# ---------------------------------------------------------
-output_q = interpreter.get_tensor(output_details[0]['index'])[0]  # shape: 256x256x1
-
-# Dequantize: f = (q - zero_point) * scale
-output_f = (output_q.astype(np.float32) - output_zero) * output_scale
-output_f = np.squeeze(output_f)   # shape: 256x256
-
-# ---------------------------------------------------------
-# Apply threshold to produce segmentation mask
-# ---------------------------------------------------------
-mask = (output_f > MASK_THRESHOLD).astype(np.uint8) * 255
-
-mask_img = Image.fromarray(mask)
-mask_img.save('segmentation_mask.png')
-
-print('Segmentation mask saved as segmentation_mask.png')
+    model = u_net_model(model_path)
+    output = model.predict(image_path)
+    # model.save_mask(mask, save_path)
+    percentage = model.calculate_percentage(output)
+    
+    print(f"Water coverage percentage: {percentage:.2f}%")
+    return percentage
+    
+if __name__ == "__main__":
+    main()
