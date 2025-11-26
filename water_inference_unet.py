@@ -80,7 +80,6 @@ class u_net_model:
         # Dequantize: f = (q - zero_point) * scale
         output_f = (output_q.astype(np.float32) - self.output_zero) * self.output_scale
         output_f = np.squeeze(output_f) 
-        output_f = self.infer(input_tensor)
         
         t4 = time.time()
         print(f"Postprocessing time: {t4 - t3:.3f} seconds")
