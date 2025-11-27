@@ -85,8 +85,12 @@ class u_net_model:
         print(f"Postprocessing time: {t4 - t3:.3f} seconds")
         return output_f
     
-def main():
-    model_path = "models/tiny_unet_int8.tflite"
+def main(model_type="8"):
+    if model_type == "8":
+        model_path = "models/tiny_unet_int8.tflite"
+    else:
+        model_path = "models/tiny_unet_float32.tflite"
+         
     image_path = "water_720.png"
 
     model = u_net_model(model_path)
@@ -98,4 +102,6 @@ def main():
     return int(percentage)
     
 if __name__ == "__main__":
-    main()
+    import sys
+    arg = sys.argv[1] if len(sys.argv) > 1 else "8"
+    main(arg)
