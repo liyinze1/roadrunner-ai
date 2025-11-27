@@ -10,6 +10,9 @@ class u_net_model:
         self.interpreter.allocate_tensors()
         self.input_details = self.interpreter.get_input_details()
         self.output_details = self.interpreter.get_output_details()
+        
+        print(f"Input details: {self.input_details}")
+        print(f"Output details: {self.output_details}")
         self.input_scale, self.input_zero = self.input_details[0]['quantization']
         self.output_scale, self.output_zero = self.output_details[0]['quantization']
         _, self.input_h, self.input_w, self.input_c = self.input_details[0]['shape']
@@ -39,10 +42,6 @@ class u_net_model:
         input_tensor = np.expand_dims(img_q, axis=0)
         return input_tensor
     
-    def infer(self, input_tensor):       
-        # Set input tensor
-  # shape: 256x256
-        return output_f
     
     def save_mask(self, output_f, save_path, threshold=MASK_THRESHOLD):
         mask = (output_f > threshold).astype(np.uint8) * 255
@@ -57,6 +56,34 @@ class u_net_model:
         return percentage
     
     def predict(self, image_path):
+        t = time.time()
+        img_np = self.load_image(image_path)
+        input_tensor = self.preprocess(img_np)
+        
+        t1 = time.time()
+        print(f"Preprocessing time: {t1 - t:.3f} seconds")
+        
+        self.interpreter.set_tensor(self.input_details[0]['index'], input_tensor)
+
+        t2 = time.time()
+        print(f"Set tensor time: {t2 - t1:.3f} seconds")
+        # Run inference
+        self.interpreter.invoke()
+
+        t3 = time.time()
+        print(f"Inference time: {t3 - t2:.3f} seconds")
+        # Retrieve output
+        output_f = self.interpreter.get_tensor(self.output_details[0]['index'])[0]  # shape: 256x256x1
+
+        # Dequantize: f = (q - zero_point) * scale
+
+        output_f = np.squeeze(output_f) 
+        
+        t4 = time.time()
+        print(f"Postprocessing time: {t4 - t3:.3f} seconds")
+        return output_f
+    
+    def predict_quantised(self, image_path):
         
         t = time.time()
         img_np = self.load_image(image_path)
@@ -89,12 +116,16 @@ def main(model_type="8"):
     if model_type == "8":
         model_path = "models/tiny_unet_int8.tflite"
     else:
-        model_path = "models/tiny_unet_float32.tflite"
+        model_path = "models/tiny_unet_fp32.tflite"
          
     image_path = "water_720.png"
 
     model = u_net_model(model_path)
-    output = model.predict(image_path)
+    
+    if model_type == "8":
+        output = model.predict_quantised(image_path)
+    else:
+        output = model.predict(image_path)
     # model.save_mask(mask, save_path)
     percentage = model.calculate_percentage(output)
     
