@@ -73,12 +73,14 @@ class u_net_model:
 
         t3 = time.time()
         print(f"Inference time: {t3 - t2:.3f} seconds")
+        
         # Retrieve output
-        output_q = self.interpreter.get_tensor(self.output_details[0]['index'])[0]  # shape: 256x256x1
-
         # Dequantize: f = (q - zero_point) * scale
         if self.dtype == np.uint8:
+            output_q = self.interpreter.get_tensor(self.output_details[0]['index'])[0]  # shape: 256x256x1
             output_f = (output_q.astype(np.float32) - self.output_zero) * self.output_scale
+        else:
+            output_f = self.interpreter.get_tensor(self.output_details[0]['index'])[0]
         output_f = np.squeeze(output_f) 
         
         t4 = time.time()
