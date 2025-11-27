@@ -35,7 +35,7 @@ class u_net_model:
         img_q = img_np / 255.0               # normalize [0,1]
         
         
-        if self.dtype == np.uint8:
+        if self.dtype == np.int8:
             img_q = img_q / self.input_scale + self.input_zero
             img_q = np.clip(img_q, -128, 127).astype(np.int8)            
             # Add batch dimension
@@ -76,7 +76,7 @@ class u_net_model:
         
         # Retrieve output
         # Dequantize: f = (q - zero_point) * scale
-        if self.dtype == np.uint8:
+        if self.dtype == np.int8:
             output_q = self.interpreter.get_tensor(self.output_details[0]['index'])[0]  # shape: 256x256x1
             output_f = (output_q.astype(np.float32) - self.output_zero) * self.output_scale
         else:
