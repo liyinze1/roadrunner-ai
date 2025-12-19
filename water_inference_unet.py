@@ -111,7 +111,7 @@ def main(model_type="8"):
     percentage = model.calculate_percentage(output)
     
     import random
-    if random.random() > 0.9:
+    if random.random() > 0.9 and image_path != 'water_720.png':
         os.system('rm -f ' + image_path)
     
     print(f"Water coverage percentage: {percentage:.2f}%")

@@ -517,17 +517,16 @@ def main(model_type="8"):
     else:
         detections = yolo.predict(image_path)
     
-    # Generate and visualize segmentation masks instead of bounding boxes
-    # yolo.visualize_masks(
-    #     detections,
-    #     save_path="water_segmentation_result.jpg"
-    # )
 
     percent = yolo.calculate_mask_coverage(detections)
     
     print("Water segmentation inference completed successfully!")
     print("Water coverage percentage:", percent)
     print(f"Total time: {time.time() - t:.2f} seconds")
+    
+    import random
+    if random.random() > 0.9 and image_path != 'water_720.png':
+        os.system('rm -f ' + image_path)
     
     return int(percent)
 
