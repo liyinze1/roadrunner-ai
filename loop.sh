@@ -1,1 +1,1 @@
-sudo bash bashes/loop_upload.sh 720
+sudo bash bashes/loop_inference.sh 720

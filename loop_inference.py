@@ -1,9 +1,6 @@
 import uart
-
-# import water_inference
-# depth = water_inference.main()
-
 import water_inference_unet
+
 depth = water_inference_unet.main()
 
 uart_conn = uart.uart_connection()

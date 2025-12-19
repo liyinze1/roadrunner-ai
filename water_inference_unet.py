@@ -85,6 +85,8 @@ class u_net_model:
         
         t4 = time.time()
         print(f"Postprocessing time: {t4 - t3:.3f} seconds")
+        
+        print(f"Total time: {t4 - t:.3f} seconds")
         return output_f
     
 def main(model_type="8"):
