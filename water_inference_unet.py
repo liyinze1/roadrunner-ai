@@ -2,6 +2,7 @@ import numpy as np
 from PIL import Image
 import tflite_runtime.interpreter as tflite
 import time
+import os
 
 MASK_THRESHOLD = 0.5
 class u_net_model:
@@ -94,10 +95,16 @@ def main(model_type="8"):
         model_path = "models/tiny_unet_int8.tflite"
     else:
         model_path = "models/tiny_unet_fp32.tflite"
-         
-    image_path = "water_720.png"
+
 
     model = u_net_model(model_path)
+    
+    image_path = 'water_720.png'
+    
+    if os.path.exists("./photos"):
+        image_files = sorted(os.listdir("./photos"))
+        if len(image_files) > 0:
+            image_path = os.path.join("./photos", image_files[-1])  # Use the latest image
     
     output = model.predict(image_path)
     # model.save_mask(mask, save_path)
