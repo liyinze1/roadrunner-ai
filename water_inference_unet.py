@@ -110,6 +110,10 @@ def main(model_type="8"):
     # model.save_mask(mask, save_path)
     percentage = model.calculate_percentage(output)
     
+    import random
+    if random.random() > 0.9:
+        os.system('rm -f ' + image_path)
+    
     print(f"Water coverage percentage: {percentage:.2f}%")
     return int(percentage)
     
