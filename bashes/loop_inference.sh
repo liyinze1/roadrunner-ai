@@ -35,12 +35,7 @@ while true; do
 
     echo "$(date '+%Y-%m-%d %H:%M:%S') - inference..." >> /dev/ttyS0
     sudo -u "acme" python3 loop_inference.py
-
-    echo "finish python"
-
     code=$?   # capture exit code
-
-    echo "exit code: $code"
 
     if [ $code -eq 0 ]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') - power off..." >> /dev/ttyS0
