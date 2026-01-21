@@ -3,7 +3,7 @@
 # Check if resolution parameter is provided
 RESOLUTION=${1:-1080}  # Default to 1080 if no parameter provided
 
-echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting process with ${RESOLUTION}p resolution..." >> log.txt
+echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting process with ${RESOLUTION}p resolution..." >> /dev/ttyS0
 
 # Configure camera settings based on resolution
 if [ "$RESOLUTION" = "720" ]; then
@@ -28,21 +28,25 @@ while true; do
 
     sleep 0.5
 
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - taking photo..." >> log.txt
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - taking photo..." >> /dev/ttyS0
 
     filename="/home/acme/roadrunner-ai/photos/$(date +%Y%m%d_%H%M%S).png"
     sudo fswebcam -i 0 -p RGB565 -r ${WIDTH}x${HEIGHT} -S 20 --no-banner "$filename"
 
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - inference..." >> log.txt
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - inference..." >> /dev/ttyS0
     sudo -u "acme" python3 loop_inference.py
+
+    echo "finish python"
 
     code=$?   # capture exit code
 
+    echo "exit code: $code"
+
     if [ $code -eq 0 ]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - power off..." >> log.txt
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - power off..." >> /dev/ttyS0
         sudo poweroff
     elif [ $code -eq 1 ]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - suspend to ram..." >> log.txt
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - suspend to ram..." >> /dev/ttyS0
         sudo mem2io -w -i fc040018,300
         sudo rtcwake -m mem -s 3600
     fi
