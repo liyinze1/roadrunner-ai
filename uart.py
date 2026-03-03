@@ -23,17 +23,14 @@ class uart_connection:
                 return True
         return False
     
-    def reqest_sleep(self):
+    def request_sleep(self):
         for _ in range(self.retry):
-            sleep_mode = self._send(b'E')
-            if sleep_mode == b'S':
-                # suspend to ram
-                return 1
-            elif sleep_mode == b'P':
-                # power off
-                return 0
-        return 0  # default to power off
-        
+            self.uart.write(b'E')
+            sleep_time = int.from_bytes(self.uart.read(2), 'little')
+            print('get sleep time:', sleep_time)
+            return sleep_time
+        return 3600
+            
     def _send(self, data):
         self.uart.write(data)
         c = self.uart.read(1)

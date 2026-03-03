@@ -27,6 +27,6 @@ while i < len(data):
     sn += 1
     print('Sent photo chunk', sn, 'total size', len(data)//payload_length)
 
-sleep_mode = uart_conn.reqest_sleep()
+sleep_mode = uart_conn.request_sleep() 
 
-exit(sleep_mode)
+exit(sleep_mode - 3)

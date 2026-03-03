@@ -23,3 +23,10 @@ sudo media-ctl -d /dev/media0 --set-v4l2 '"atmel_isc_scaler":0[fmt:SBGGR8_1X8/19
 sudo v4l2-ctl -v pixelformat=RGBP,height=1080,width=1920
 sudo v4l2-ctl  --set-parm=15
 sudo fswebcam -i 0 -p RGB565 -r 1920x1080 -S 20 --no-banner 1920x1080_SBGGR8.png
+
+# Check if this file exists
+cat /sys/devices/platform/ahb/ahb:apb/fc028000.i2c/power/control
+
+# If yes, try this:
+echo on | sudo tee /sys/devices/platform/ahb/ahb:apb/fc028000.i2c/power/control
+echo auto | sudo tee /sys/devices/platform/ahb/ahb:apb/fc028000.i2c/power/control
